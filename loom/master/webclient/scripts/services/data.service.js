@@ -26,35 +26,35 @@ function DataService($http) {
     };
 
     function setActiveRun(runId) {
-	return $http.get('/api/workflow_runs/' + runId)
+	return $http.get('/api/workflow_runs/' + runId + '/')
             .then(function(response) {
 		activeData.run = response.data;
             });
     };
 
     function setActiveStepRun(stepRunId) {
-	return $http.get('/api/step_runs/' + stepRunId)
+	return $http.get('/api/step_runs/' + stepRunId + '/')
             .then(function(response) {
 		activeData.stepRun = response.data;
             });
     };
 
     function setActiveWorkflow(workflowId) {
-	return $http.get('/api/workflows/' + workflowId)
+	return $http.get('/api/workflows/' + workflowId + '/')
             .then(function(response) {
 		activeData.workflow = response.data;
             });
     };
 
     function setActiveStep(stepId) {
-	return $http.get('/api/steps/' + stepId)
+	return $http.get('/api/steps/' + stepId + '/')
             .then(function(response) {
 		activeData.step = response.data;
             });
     };
 
     function setActiveFile(fileId) {
-	return $http.get('/api/file_data_objects/' + fileId)
+	return $http.get('/api/file_data_objects/' + fileId + '/')
             .then(function(response) {
 		activeData.file = response.data;
             });

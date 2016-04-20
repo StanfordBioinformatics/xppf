@@ -121,7 +121,7 @@ class FileUploader(AbstractUploader):
         return raw_input(text)
 
     def _upload_files(self):
-        return self.filehandler.upload_files_from_local_paths(
+        return self.filehandler.import_files_from_local_paths(
             self.local_paths,
             source_record=self.source_record_text
         )

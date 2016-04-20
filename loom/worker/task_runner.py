@@ -72,7 +72,7 @@ class TaskRunner(object):
         self.objecthandler.update_task_run(self.task_run)
 
     def _get_additional_settings(self):
-        url = self.settings['MASTER_URL'] + '/api/workerinfo'
+        url = self.settings['MASTER_URL'] + '/api/workerinfo/'
         response = requests.get(url)
         response.raise_for_status()
         workerinfo = response.json()['workerinfo']
@@ -81,7 +81,7 @@ class TaskRunner(object):
         return workerinfo
 
     def _init_task_run(self):
-        url = self.settings['MASTER_URL'] + '/api/task_runs/' + self.settings['RUN_ID']
+        url = self.settings['MASTER_URL'] + '/api/task_runs/%s/' % self.settings['RUN_ID']
         response = requests.get(url)
         response.raise_for_status()
         self.task_run = response.json()

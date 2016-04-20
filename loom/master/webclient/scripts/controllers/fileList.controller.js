@@ -14,7 +14,7 @@ function FileListController($scope, DataService){
     });
 };    
     /*
-    $http.get('/api/file_data_objects')
+    $http.get('/api/file_data_objects/')
 	.success(function(response) {
 	    Data.files = response['file_data_objects'];
 	    $scope.files = Data.files;

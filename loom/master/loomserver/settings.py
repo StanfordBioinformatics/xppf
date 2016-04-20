@@ -10,6 +10,7 @@ import warnings
 include_models = os.getenv('GRAPH_MODELS_INCLUDE_MODELS')
 
 BASE_DIR = os.path.dirname(__file__)
+DOC_ROOT = os.path.join(BASE_DIR, '..', 'webclient')
 
 def get_secret_key():
     SECRET_FILE = os.path.join(BASE_DIR, 'secret.txt')
@@ -30,9 +31,8 @@ def get_secret_key():
 
 SECRET_KEY = get_secret_key()
 
-if os.getenv('LOOM_DEBUG_TRUE'):
-    DEBUG = True
-    TEMPLATE_DEBUG = True
+# TODO
+# if os.getenv('LOOM_DEBUG_TRUE'):
 DEBUG = True
 TEMPLATE_DEBUG = True
 

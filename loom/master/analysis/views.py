@@ -130,6 +130,3 @@ def run_tasks(request):
     TaskRun.run_all()
     return JsonResponse({"status": "ok"}, status=200)
 
-def browser(request):
-    return render(request, 'browser.html')
-
