@@ -4,9 +4,11 @@ import abc
 from copy import copy
 import datetime
 import errno
+import logging
 import os
 import shutil
 import subprocess
+import sys
 
 import gcloud.storage
 import requests
@@ -14,6 +16,7 @@ import requests
 from loom.common import md5calc
 from loom.common.exceptions import *
 from loom.common.objecthandler import ObjectHandler
+from loom.common.logger import StreamToLogger
 
 # Google Storage JSON API imports
 from apiclient.http import MediaIoBaseDownload
@@ -63,6 +66,10 @@ class AbstractFileHandler:
         self.objecthandler = ObjectHandler(master_url)
         self.settings = settings
         self.logger = logger
+        stdout_logger = StreamToLogger(self.logger, logging.INFO)
+        sys.stdout = stdout_logger
+        stderr_logger = StreamToLogger(self.logger, logging.ERROR)
+        sys.stderr = stderr_logger
 
     @abc.abstractmethod
     def upload(self, local_path, destination_location):
@@ -73,7 +80,7 @@ class AbstractFileHandler:
         pass
 
     @abc.abstractmethod
-    def get_step_output_location(self, local_path, file_object=None):
+    def get_step_output_location(self, local_path, workflowrun_timestamp, workflow_name, step_name, file_object=None):
         pass
 
     @abc.abstractmethod
@@ -103,21 +110,16 @@ class AbstractFileHandler:
             # TODO handle download failures
             break
     
-    def _get_step_output_path(self, local_path):
-        """Step outputs are placed in directories of the same name as the
-        local directories, and named with the same filename.
+    def _get_step_output_path(self, local_path, workflowrun_timestamp, workflow_name, step_name):
+        """Step outputs are placed in $FILE_ROOT/runs/$workflowrun_timestamp_$workflow_name/$step_name,
+        and named with the same file name.
         """
         filename = os.path.basename(local_path)
-        step_run_dir = os.path.basename(os.path.dirname(local_path))
-        workflow_dir = os.path.basename(os.path.dirname(
-            os.path.dirname(local_path)))
-        workflows_dir = os.path.basename(os.path.dirname(
-            os.path.dirname(os.path.dirname(local_path))))
         return os.path.join(
             self.settings['FILE_ROOT'],
-            workflows_dir,
-            workflow_dir,
-            step_run_dir,
+            'runs',
+            '_'.join([str(workflowrun_timestamp), workflow_name]),
+            step_name,
             filename
         )
 
@@ -137,18 +139,18 @@ class AbstractFileHandler:
             return
         self.logger.info(message)
     
-    def upload_files_from_local_paths(self, local_paths, source_record=None, source_directory=None):
+    def import_files_from_local_paths(self, local_paths, source_record=None, source_directory=None):
         upload_request_time = self.objecthandler.get_server_time()
         file_objects = []
         destination_locations = []
         # Upload files, create FileDataObjects and StorageLocations
         for local_path in local_paths:
-            file_objects.append(self.upload_file_from_local_path(local_path, source_directory=source_directory, upload_request_time=upload_request_time))
+            file_objects.append(self.import_file_from_local_path(local_path, source_directory=source_directory, upload_request_time=upload_request_time))
         # Create source_record if one exists
         self._create_source_record(file_objects, source_record=source_record)
         return file_objects
             
-    def upload_file_from_local_path(self, local_path, source_directory=None, source_record=None, upload_request_time=None):
+    def import_file_from_local_path(self, local_path, source_directory=None, source_record=None, upload_request_time=None):
         """Upload files, create FileDataObjects and StorageLocations
         """
         local_path = self._add_directory(source_directory, local_path)
@@ -159,15 +161,49 @@ class AbstractFileHandler:
         file_object = self.create_file_data_object_from_local_path(local_path)
         file_object = self.objecthandler.post_data_object(file_object)
 
-        # Create source_record if one exists
+        # Create source_record if called with one as an argument
         self._create_source_record([file_object], source_record=source_record)
-        self._log("Created file %s@%s" % (file_object['file_name'], file_object['_id']))
+        self._log("Created file source record %s@%s" % (file_object['file_name'], file_object['_id']))
 
         storage_locations = self.objecthandler.get_file_storage_locations_by_file(file_object['_id'])
         if len(storage_locations) == 0:
             destination_location = self.get_import_location(file_object, upload_request_time)
+            self._log("Uploading to destination location %s" % destination_location)
             self.upload(local_path, destination_location)
             self.objecthandler.post_file_storage_location(destination_location)
+
+        return file_object
+
+    def upload_step_output_from_local_path(self, local_path, workflowrun_timestamp, workflow_name, step_name, source_directory=None, source_record=None, upload_request_time=None):
+        """Upload files, create FileDataObjects and StorageLocations
+        """
+        local_path = self._add_directory(source_directory, local_path)
+        
+        if upload_request_time is None:
+            upload_request_time = self.objecthandler.get_server_time()
+        self._log("Uploading %s ..." % local_path)
+        file_data_object = self.create_file_data_object_from_local_path(local_path)
+        self._log("Posting file data object %s" % file_data_object)
+        file_object = self.objecthandler.post_data_object(file_data_object)
+        self._log("Created file object %s" % file_object)
+
+        # Create source_record if called with one as an argument
+        result = self._create_source_record([file_object], source_record=source_record)
+        self._log("Result of creating source record: %s" % result)
+        if result is not None:
+            self._log("Created data source record %s@%s" % (file_object['file_name'], file_object['_id'])) 
+
+        storage_locations = self.objecthandler.get_file_storage_locations_by_file(file_object['_id'])
+        self._log("Got storage_locations %s" % storage_locations)
+
+        if len(storage_locations) == 0:
+            self._log("Trying to get a step output destination location with file object %s, workflowrun_timestamp %s, workflow_name %s, step_name %s, upload_request_time %s" % (file_object, workflowrun_timestamp, workflow_name, step_name, upload_request_time))
+            destination_location = self.get_step_output_location(local_path, workflowrun_timestamp, workflow_name, step_name, file_object=file_object)
+            self._log("Uploading to destination location %s" % destination_location)
+            self.upload(local_path, destination_location)
+            self.objecthandler.post_file_storage_location(destination_location)
+        else:
+            self._log("Not uploading because storage locations already exist: %s" % storage_locations)
 
         return file_object
 
@@ -180,10 +216,12 @@ class AbstractFileHandler:
         
     def _create_source_record(self, data_objects, source_record=None):
         if source_record is not None:
-            self.objecthandler.post_data_source_record(
+            return self.objecthandler.post_data_source_record(
                 {'data_objects': data_objects,
                  'source_description': source_record}
             )
+        else:
+            return None
 
     def download_files(self, file_ids, local_names=None, target_directory=None):
         if local_names is None:
@@ -223,12 +261,12 @@ class AbstractPosixPathFileHandler(AbstractFileHandler):
     """Base class for filehandlers that deal with POSIX-style file paths."""
     __metaclass__ = abc.ABCMeta
 
-    def get_step_output_location(self, local_path, file_object=None):
+    def get_step_output_location(self, local_path, workflowrun_timestamp, workflow_name, step_name, file_object=None):
         if file_object is None:
             file_object = create_file_data_object_from_local_path(local_path)
         location = {
             'file_contents': file_object['file_contents'],
-            'file_path': self._get_step_output_path(local_path),
+            'file_path': self._get_step_output_path(local_path, workflowrun_timestamp, workflow_name, step_name),
             'host_url': self.settings['FILE_SERVER_FOR_WORKER']
             }
         return location
@@ -260,7 +298,6 @@ class LocalFileHandler(AbstractPosixPathFileHandler):
                 else:
                     raise e
             shutil.copyfile(local_path, destination_path)
-        return
 
     def download(self, source_location, local_path):
         """Save space by hardlinking file into the working dir instead of 
@@ -310,38 +347,6 @@ class RemoteFileHandler(AbstractPosixPathFileHandler):
             )
         return self._remote_path
 
-class ElasticlusterFileHandler(AbstractPosixPathFileHandler):
-    """ TODO: Use elasticluster and GCE-specific parameters for file transfer. 
-    Consider using elasticluster's ssh and sftp commands instead.
-    - Would decouple loom from cloud specifics (key management, username, fileserver IP).
-    - However, nesting virtualenvs seems problematic, and would have to locate
-      elasticluster installation or let user specify.
-    """
-
-    def _upload_file_to_elasticluster(self):
-        username = self.settings_manager.get_remote_username()
-        gce_key = os.path.join(os.getenv('HOME'),'.ssh','google_compute_engine')
-        if not os.path.exists(gce_key):
-            raise FileHandlerError("GCE key not found at %s" % gce_key)
-        print "Creating working directory on elasticluster at %s" % self.file_server
-        subprocess.check_call(
-            ['ssh',
-             username+'@'+self.file_server,
-             '-i',
-             gce_key,
-             'mkdir',
-             '-p',
-             os.path.dirname(self.get_cluster_remote_path(username))]
-             )
-        print "Uploading file to elasticluster at %s" % self.file_server
-        subprocess.check_call(
-            ['scp',
-             '-i',
-             gce_key,
-             self.local_path,
-             ':'.join([username+'@'+self.file_server, self.get_cluster_remote_path(username)])]
-            )
-
 
 class GoogleCloudFileHandler(AbstractFileHandler):
     """Subclass of FileHandler that uses the gcloud module to copy files to and from Google Storage."""
@@ -382,14 +387,14 @@ class GoogleCloudFileHandler(AbstractFileHandler):
             blob = gcloud.storage.blob.Blob(blob_path, bucket)
         return blob
 
-    def get_step_output_location(self, local_path, file_object=None):
+    def get_step_output_location(self, local_path, workflowrun_timestamp, workflow_name, step_name, file_object=None):
         if file_object is None:
             file_object = create_file_data_object_from_local_path(local_path)
         location = {
             'file_contents': file_object['file_contents'],
             'project_id': self.settings['PROJECT_ID'],
             'bucket_id': self.settings['BUCKET_ID'],
-            'blob_path': self._get_step_output_path(local_path),
+            'blob_path': self._get_step_output_path(local_path, workflowrun_timestamp, workflow_name, step_name),
             }
         return location
 

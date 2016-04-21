@@ -1,0 +1,19 @@
+<img src="assets/loading.gif" alt="Loading..." ng-show="loading" class="center-block">
+<div class="table-responsive" ng-hide="loading">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Step</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="step in activeData.workflow.steps">
+        <td>
+	  <a ng-href="#/workflows/{{activeData.workflow._id}}/steps/{{step._id}}">
+	    {{step.step_name}}
+	  </a>
+	</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

@@ -90,6 +90,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
                         'ansible>=2.0.1.0',
+                        'apache-libcloud>=0.13',
                         'Django>=1.8,<1.9',
                         'django-extensions>=1.5.5',
                         'django-sortedone2many>=0.1.8',

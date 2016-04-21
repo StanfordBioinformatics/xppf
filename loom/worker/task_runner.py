@@ -8,11 +8,13 @@ import logging
 import os
 import requests
 import subprocess
+import sys
 import time
 import uuid
 
 from loom.common.filehandler import FileHandler
 from loom.common.objecthandler import ObjectHandler
+from loom.common.logger import StreamToLogger
 
 class TaskRunner(object):
 
@@ -25,14 +27,14 @@ class TaskRunner(object):
             'MASTER_URL': args.master_url
         }
         self.settings.update(self._get_additional_settings())
+        self._prepare_working_directory(self.settings['WORKING_DIR'])
+        self._add_logfiles()
         self._init_logger()
         self._init_filehandler()
         self._init_objecthandler()
         self._init_task_run()
         
     def run(self):
-        self._prepare_working_directory(self.settings['WORKING_DIR'])
-        self._add_logfiles()
 
         self._download_inputs()
         
@@ -42,6 +44,7 @@ class TaskRunner(object):
                 self._wait_for_process(process)
 
         self._upload_outputs()
+        self._upload_logfiles()
 
         # self._flag_run_as_complete(self.step_run)
         print "done"
@@ -56,11 +59,20 @@ class TaskRunner(object):
     def _upload_outputs(self):
         for task_run_output in self.task_run['task_run_outputs']:
             path = task_run_output['task_definition_output']['path']
-            task_run_output['data_object'] = self.filehandler.upload_file_from_local_path(path, source_directory=self.settings['WORKING_DIR'])
+            task_run_output['data_object'] = self.filehandler.upload_step_output_from_local_path(path, self.task_run['workflow_run_datetime_created'], self.task_run['workflow_name'], self.task_run['step_name'], source_directory=self.settings['WORKING_DIR'])
         self.objecthandler.update_task_run(self.task_run)
-        
+
+    def _upload_logfiles(self):
+        for logfile in (self.settings['STEP_LOGFILE'], self.settings['STDOUT_LOGFILE'], self.settings['STDERR_LOGFILE']):
+            file_object = self.filehandler.upload_step_output_from_local_path(logfile, self.task_run['workflow_run_datetime_created'], self.task_run['workflow_name'], self.task_run['step_name'])
+            task_run_log = {'logfile': file_object, 'logname': os.path.basename(logfile)}
+            if 'logs' not in self.task_run:
+                self.task_run['logs'] = []
+            self.task_run['logs'].append(task_run_log)
+        self.objecthandler.update_task_run(self.task_run)
+
     def _get_additional_settings(self):
-        url = self.settings['MASTER_URL'] + '/api/workerinfo'
+        url = self.settings['MASTER_URL'] + '/api/workerinfo/'
         response = requests.get(url)
         response.raise_for_status()
         workerinfo = response.json()['workerinfo']
@@ -69,22 +81,22 @@ class TaskRunner(object):
         return workerinfo
 
     def _init_task_run(self):
-        url = self.settings['MASTER_URL'] + '/api/task_runs/' + self.settings['RUN_ID']
+        url = self.settings['MASTER_URL'] + '/api/task_runs/%s/' % self.settings['RUN_ID']
         response = requests.get(url)
         response.raise_for_status()
         self.task_run = response.json()
         self.logger.debug('Retrieved TaskRun %s' % self.task_run)
-        
+
     def _get_task_run(self):
         print self.master_url
 
     def _prepare_working_directory(self, working_dir):
-        self.logger.debug('Trying to create working directory %s' % working_dir)
+        print 'trying to create %s' % working_dir
         try:
             os.makedirs(working_dir)
         except OSError as e:
             if e.errno == errno.EEXIST and os.path.isdir(working_dir):
-                self.logger.debug('Found working directory %s' % working_dir)
+                pass
             else:
                 raise
 
@@ -163,29 +175,30 @@ class TaskRunner(object):
     def _init_logger(self):
         self.logger = logging.getLogger("LoomWorker")
         self.logger.setLevel(self.settings['LOG_LEVEL'])
+        self.logger.raiseExceptions = True
         formatter = logging.Formatter('%(levelname)s [%(asctime)s] %(message)s')
         handler = self._init_handler()
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
+        stdout_logger = StreamToLogger(self.logger, logging.INFO)
+        sys.stdout = stdout_logger
+        stderr_logger = StreamToLogger(self.logger, logging.ERROR)
+        sys.stderr = stderr_logger
         
     def _init_handler(self):
-        if self.settings.get('WORKER_LOGFILE') is None:
+        if self.settings.get('STEP_LOGFILE') is None:
             return logging.StreamHandler()
         else:
-            if not os.path.exists(os.path.dirname(self.settings['WORKER_LOGFILE'])):
-                os.makedirs(os.path.dirname(self.settings['WORKER_LOGFILE']))
-            return logging.FileHandler(self.settings['WORKER_LOGFILE'])
+            if not os.path.exists(os.path.dirname(self.settings['STEP_LOGFILE'])):
+                os.makedirs(os.path.dirname(self.settings['STEP_LOGFILE']))
+            return logging.FileHandler(self.settings['STEP_LOGFILE'])
 
     def _add_logfiles(self):
         """Add logfiles for the worker, stdout, and stderr."""
         self.settings.update({'STEP_LOGFILE': os.path.join(self.settings['WORKING_DIR'], 'worker_log.txt')})
         self.settings.update({'STDOUT_LOGFILE': os.path.join(self.settings['WORKING_DIR'], 'stdout_log.txt')})
         self.settings.update({'STDERR_LOGFILE': os.path.join(self.settings['WORKING_DIR'], 'stderr_log.txt')})
-        
-        formatter = logging.Formatter('%(levelname)s [%(asctime)s] %(message)s')
-        handler = logging.FileHandler(self.settings['STEP_LOGFILE'])
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+
 
 # pip entrypoint requires a function with no arguments 
 def main():

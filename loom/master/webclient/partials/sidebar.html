@@ -1,0 +1,7 @@
+<div class="col-sm-3 col-md-2 sidebar">
+  <ul class="nav nav-sidebar" ng-controller="SidebarController">
+    <li ng-class="{active: $location.$$path.startsWith('/runs')}"><a href="#/runs">Runs</a></li>
+    <li ng-class="{active: $location.$$path.startsWith('/workflows')}"><a href="#/workflows">Workflows</a></li>
+    <li ng-class="{active: $location.$$path.startsWith('/files')}"><a href="#/files">Files</a></li>
+  </ul>
+</div>

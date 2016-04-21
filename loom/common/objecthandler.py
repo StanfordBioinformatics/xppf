@@ -69,7 +69,7 @@ class ObjectHandler(object):
 
     def get_data_object_array(self, array_id):
         return self._get_object(
-            'data_object_arrays/'+array_id)
+            'data_object_arrays/%s/' % array_id)
 
     def post_data_object_array(self, data_object_array):
         return self._post_object(
@@ -78,7 +78,7 @@ class ObjectHandler(object):
 
     def get_file_data_object(self, file_id):
         return self._get_object(
-            'file_data_objects/'+file_id)
+            'file_data_objects/%s/' % file_id)
 
     def get_file_data_object_index(self, query_string='', min=0, max=float('inf')):
         if query_string:
@@ -115,7 +115,7 @@ class ObjectHandler(object):
     
     def get_workflow(self, workflow_id):
         return self._get_object(
-            'workflows/'+workflow_id
+            'workflows/%s/' % workflow_id
         )
 
     def get_workflow_index(self, query_string='', min=0, max=float('inf')):
@@ -137,7 +137,7 @@ class ObjectHandler(object):
 
     def get_workflow_run(self, workflow_run_id):
         return self._get_object(
-            'workflow_runss/'+workflow_run_id
+            'workflow_runs/%s/' % workflow_run_id
         )
 
     def get_workflow_run_index(self, query_string='', min=0, max=float('inf')):
@@ -160,4 +160,4 @@ class ObjectHandler(object):
     def update_task_run(self, task_run):
         return self._post_object(
             task_run,
-            'task_runs/' + task_run['_id'])
+            'task_runs/%s/' % task_run['_id'])

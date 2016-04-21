@@ -8,7 +8,7 @@ from django.conf import settings
 
 from loom.master.analysis.task_manager.cloud import CloudTaskManager
 from loom.master.analysis.task_manager.cloud import CloudTaskManagerError
-from loom.common.helper import on_gcloud_vm
+from loom.common.cloud import on_gcloud_vm
 
 
 @unittest.skipIf(not on_gcloud_vm(), 'not running on Google Compute Engine VM')

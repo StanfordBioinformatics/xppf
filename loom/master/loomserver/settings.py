@@ -1,6 +1,7 @@
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.7/howto/deployment/checklist/
 
+import datetime
 import os
 import socket
 import sys
@@ -9,6 +10,7 @@ import warnings
 include_models = os.getenv('GRAPH_MODELS_INCLUDE_MODELS')
 
 BASE_DIR = os.path.dirname(__file__)
+DOC_ROOT = os.path.join(BASE_DIR, '..', 'webclient')
 
 def get_secret_key():
     SECRET_FILE = os.path.join(BASE_DIR, 'secret.txt')
@@ -29,9 +31,8 @@ def get_secret_key():
 
 SECRET_KEY = get_secret_key()
 
-if os.getenv('LOOM_DEBUG_TRUE'):
-    DEBUG = True
-    TEMPLATE_DEBUG = True
+# TODO
+# if os.getenv('LOOM_DEBUG_TRUE'):
 DEBUG = True
 TEMPLATE_DEBUG = True
 
@@ -64,11 +65,29 @@ WSGI_APPLICATION = 'loomserver.wsgi.application'
 
 MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
 
+def get_database_name():
+    DATABASE_NAME_FILE = os.path.join(BASE_DIR, 'dbname.txt')
+    try:
+        DATABASE_NAME = open(DATABASE_NAME_FILE).read().strip()
+        return DATABASE_NAME
+    except IOError:
+        try:
+            DATABASE_NAME = datetime.datetime.utcnow().strftime("loom-%Y%m%d-%H%M%S")
+            f = file(DATABASE_NAME_FILE, 'w')
+            f.write(DATABASE_NAME)
+            f.close()
+            return DATABASE_NAME
+        except IOError:
+            Exception('Failed to create file for database name. Please create file "%s"' \
+                      ' with a name for the Loom database' % DATABASE_NAME_FILE)
+
+DATABASE_NAME = get_database_name()
+
 if not os.getenv('LOOM_TEST_DATABASE'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'loom.sqlite3'),
+            'NAME': os.path.join(BASE_DIR, DATABASE_NAME+'.sqlite3'),
         }
     }
 else:

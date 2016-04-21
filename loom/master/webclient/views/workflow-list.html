@@ -1,0 +1,18 @@
+<img src="assets/loading.gif" alt="Loading..." ng-show="loading" class="center-block">
+<div class="table-responsive" ng-hide="loading">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+	<th>Workflow</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="workflow in workflows">
+        <td><a ng-href="#/workflows/{{workflow._id}}">
+	    {{workflow.workflow_name}}@{{workflow._id | limitTo:8}}
+        </a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+

@@ -1,0 +1,36 @@
+<img src="assets/loading.gif" alt="Loading..." ng-show="loading" class="center-block">
+<div class="table-responsive" ng-hide="loading">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>File</th>
+	<th>md5</th>
+        <th>Notes</th>
+	<th>Locations</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          {{activeData.file.file_name}}@{{activeData.file._id | limitTo:8}}
+	</td>
+        <td>
+          {{activeData.file.file_contents.hash_value}}
+        </td>
+	<td>
+	  <p ng-repeat="record in activeData.file.data_source_records">{{record.source_description}}</p>
+        </td>
+	<td>
+	  <p ng-repeat="loc in activeData.file.file_storage_locations">
+	    <span ng-if="loc.host_url == 'localhost'">file://{{loc.file_path}}
+	    </span>
+	    <a href="https://storage.cloud.google.com/{{loc.bucket_id}}/{{loc.blob_path}}" download="{{activeData.file.file_name}}" ng-if="loc.blob_path">
+	      https://storage.cloud.google.com/{{loc.bucket_id}}/{{loc.blob_path}}
+	    </a>
+	  </p>
+	</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+

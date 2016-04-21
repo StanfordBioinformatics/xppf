@@ -118,8 +118,8 @@ class SettingsManager:
             # Valid choices: LOCAL, REMOTE, GOOGLE_CLOUD
             'FILE_SERVER_TYPE': 'GOOGLE_CLOUD',
             'FILE_ROOT': 'loom_working_dir',
-            'PROJECT_ID': 'gbsc-gcp-project-mvp-dev',
-            'BUCKET_ID': 'gbsc-gcp-project-mvp-dev-group',
+            'PROJECT_ID': '<insert-gcloud-project-id-here>',
+            'BUCKET_ID': '<insert-gcloud-bucket-id-here>',
 
             # Info needed by task manager
             'ANSIBLE_PEM_FILE': 'unused',
@@ -179,8 +179,8 @@ class SettingsManager:
             # Valid choices: LOCAL, REMOTE, GOOGLE_CLOUD
             'FILE_SERVER_TYPE': 'GOOGLE_CLOUD',
             'FILE_ROOT': 'loom_working_dir',
-            'PROJECT_ID': 'gbsc-gcp-project-scgs-dev',
-            'BUCKET_ID': 'gbsc-gcp-project-scgs-dev-group',
+            'PROJECT_ID': '<insert-gcloud-project-id-here>',
+            'BUCKET_ID': '<insert-gcloud-bucket-id-here>',
 
             # Info needed by task manager; unused because master is on a different machine than client
             'ANSIBLE_PEM_FILE': 'unused',
@@ -235,7 +235,7 @@ class SettingsManager:
             'LOG_LEVEL': 'DEBUG',
 
             # Info needed by CloudTaskManager
-            'ANSIBLE_PEM_FILE': '~/key.pem',
+            'ANSIBLE_PEM_FILE': '~/pkey.pem',
             'GCE_KEY_FILE': '~/.ssh/google_compute_engine',
             'WORKER_VM_IMAGE': 'container-vm',  # image to use when task manager boots up a worker VM
             'WORKER_LOCATION': 'us-central1-a', # location to use when task manager boots up a worker VM
@@ -272,8 +272,8 @@ class SettingsManager:
             'REMOTE_USERNAME': 'unused',     # Only used by ElasticlusterFileHandler to locate SSH keys on remote host
 
             # Shared by any cloud components
-            'PROJECT_ID': 'gbsc-gcp-project-scgs-dev',
-            'BUCKET_ID': 'gbsc-gcp-project-scgs-dev-group'
+            'PROJECT_ID': '<insert-gcloud-project-id-here>',
+            'BUCKET_ID': '<insert-gcloud-bucket-id-here>'
         }
     }
 

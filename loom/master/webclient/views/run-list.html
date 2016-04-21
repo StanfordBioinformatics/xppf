@@ -1,0 +1,32 @@
+<img src="assets/loading.gif" alt="Loading..." ng-show="loading" class="center-block">
+<div ng-hide="loading">
+  <div class="table-responsive" >
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Status</th>
+          <th>Started</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr ng-repeat="run in runs">
+          <td><a ng-href="#/runs/{{run._id}}">
+              {{run.workflow.workflow_name}}@{{run._id | limitTo:8}}
+          </a></td>
+          <td>
+            {{run.status}}
+          </td>
+          <td>
+            {{run.datetime_created | date:'medium'}}
+          </td>
+          <td>
+            {{run.datetime_updated | date:'medium'}}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+

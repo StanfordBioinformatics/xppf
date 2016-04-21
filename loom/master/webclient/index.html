@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="loom">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="Loom Workflow Engine Dashboard">
+    <meta name="author" content="Isaac Liao">
+    <link rel="icon" href="favicon.ico">
+
+    <title>Loom Workflow Engine</title>
+    <!-- Bootstrap core CSS -->
+    <link href="bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <link href="bootstrap/assets/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="dashboard.css" rel="stylesheet">
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+    <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/apple-touch-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/apple-touch-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/apple-touch-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png">
+    <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="/favicon-194x194.png" sizes="194x194">
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/png" href="/android-chrome-192x192.png" sizes="192x192">
+    <link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="msapplication-TileImage" content="/mstile-144x144.png">
+    <meta name="theme-color" content="#ffffff">
+  </head>
+
+  <body>
+    <div ng-include="'partials/menubar.html'"></div>
+    <div class="container-fluid">
+      <div class="row">
+	<div ng-include="'partials/sidebar.html'" ng-controller="SidebarController"></div>
+        <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+          <div ng-include="'partials/breadcrumb.html'" ng-controller="BreadcrumbController"></div>
+          <div ng-view=""></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="bootstrap/assets/js/vendor/jquery.min.js"></script>
+    <script src="bootstrap/dist/js/bootstrap.min.js"></script>
+    <!-- Just to make our placeholder images work. Don't actually copy the next line! -->
+    <script src="bootstrap/assets/js/vendor/holder.min.js"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <script src="bootstrap/assets/js/ie10-viewport-bug-workaround.js"></script>
+
+    <!-- Angular.js -->
+    <script src="angular/1.5.0/angular.min.js"></script>
+    <script src="angular/1.5.0/angular-route.min.js"></script>
+
+    <!-- Loom app and controllers -->
+    <script src="scripts/loom.js"></script>
+    <script src="scripts/loom.routes.js"></script>
+    <script src="scripts/services/data.service.js"></script>
+    <script src="scripts/controllers/sidebar.controller.js"></script>
+    <script src="scripts/controllers/breadcrumb.controller.js"></script>
+    <script src="scripts/controllers/runList.controller.js"></script>
+    <script src="scripts/controllers/runDetail.controller.js"></script>
+    <script src="scripts/controllers/stepRunDetail.controller.js"></script>
+    <script src="scripts/controllers/workflowList.controller.js"></script>
+    <script src="scripts/controllers/workflowDetail.controller.js"></script>
+    <script src="scripts/controllers/stepDetail.controller.js"></script>
+    <script src="scripts/controllers/fileList.controller.js"></script>
+    <script src="scripts/controllers/fileDetail.controller.js"></script>
+  </body>
+</html>

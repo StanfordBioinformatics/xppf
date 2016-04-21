@@ -1,0 +1,18 @@
+<h4 class="sub-header">
+  <ol class="breadcrumb" ng-show="$location.$$path.startsWith('/runs')"> 
+    <li><a href="#/runs">Runs</a></li>
+    <li ng-show="params.runId"><a ng-href="#/runs/{{params.runId}}">{{activeData.run.workflow.workflow_name}}@{{activeData.run._id | limitTo:8}}</a></li> 
+    <li ng-show="params.stepRunId" class="active">Steps</li> 
+    <li ng-show="params.stepRunId"><a ng-href="#/runs/{{params.runId}}/steps/{{params.stepRunId}}">{{activeData.stepRun.step.step_name}}</a></li> 
+  </ol>
+  <ol class="breadcrumb" ng-show="$location.$$path.startsWith('/workflows')">
+    <li><a href="#/workflows">Workflows</a></li>
+    <li ng-show="params.workflowId"><a ng-href="#/workflows/{{params.workflowId}}">{{activeData.workflow.workflow_name}}@{{activeData.workflow._id | limitTo:8}}</a></li> 
+    <li ng-show="params.stepId" class="active">Steps</li> 
+    <li ng-show="params.stepId"><a ng-href="#/workflows/{{params.workflowId}}/steps/{{params.stepId}}">{{activeData.step.step_name}}</a></li> 
+  </ol>
+  <ol class="breadcrumb" ng-show="$location.$$path.startsWith('/files')">
+    <li><a href="#/files">Files</a></li>
+    <li ng-show="params.fileId"><a ng-href="#/filesfiles.file/{{fileId}}">{{activeData.file.file_name}}@{{activeData.file._id | limitTo:8}}</a></li>
+  </ol>
+</h4>

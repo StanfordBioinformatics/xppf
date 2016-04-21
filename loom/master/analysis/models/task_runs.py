@@ -1,4 +1,5 @@
 from django.core import exceptions
+from django.utils import timezone
 
 from analysis.models.base import AnalysisAppInstanceModel, AnalysisAppImmutableModel
 from analysis.models.task_definitions import *
@@ -20,6 +21,10 @@ class TaskRun(AnalysisAppInstanceModel):
     task_run_outputs = fields.OneToManyField('TaskRunOutput', related_name='task_run')
     active_task_run_location = fields.ForeignKey('TaskRunLocation', null=True, related_name='active_task_run')
     task_run_locations = fields.OneToManyField('TaskRunLocation', related_name='task_run')
+    step_name = fields.CharField(max_length=255, default='')
+    workflow_name = fields.CharField(max_length=255, default='')
+    workflow_run_datetime_created = fields.DateTimeField(default=timezone.now) 
+    logs = fields.OneToManyField('TaskRunLog', related_name='task_run')
     status = fields.CharField(
         max_length=255,
         default='ready_to_run',
@@ -134,3 +139,8 @@ class TaskRunLocation(AnalysisAppInstanceModel):
     def cancel(self):
         # TODO
         pass
+
+
+class TaskRunLog(AnalysisAppInstanceModel):
+    logfile = fields.ForeignKey('FileDataObject')
+    logname = fields.CharField(max_length=255)

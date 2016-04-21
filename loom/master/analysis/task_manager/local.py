@@ -30,4 +30,4 @@ class LocalTaskManager:
                '--master_url',
                settings.MASTER_URL_FOR_WORKER]
         logger.debug(cmd)
-        proc = subprocess.Popen(cmd)
+        proc = subprocess.Popen(cmd, stderr=subprocess.STDOUT)

@@ -1,0 +1,23 @@
+<img src="assets/loading.gif" alt="Loading..." ng-show="loading" class="center-block">
+<div class="table-responsive" ng-hide="loading">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>md5</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="file in files">
+        <td>
+	  <a ng-href="#/files/{{file._id}}">
+            {{file.file_name}}{{file._id | limitTo:8}}
+	  </a>
+        </td>
+        <td>
+          {{file.file_contents.hash_value}}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

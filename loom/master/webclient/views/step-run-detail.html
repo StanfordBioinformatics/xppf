@@ -1,0 +1,66 @@
+
+<h4>Inputs</h4>
+<div class="table-responsive" >
+  <table class="table table-striped">
+    <thead>
+      <tr>
+	<th>Name</th>
+	<th>File</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="input in activeData.stepRun.step.step_inputs">
+	<td>{{input.from_channel}}</td>
+	<td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<h4>Outputs</h4>
+<div class="table-responsive" >
+  <table class="table table-striped">
+    <thead>
+      <tr>
+	<th>Name</th>
+	<th>File</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="output in activeData.stepRun.step.step_outputs">
+	<td>{{output.to_channel}}</td>
+	<td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<h4>Step Details</h4>
+<div class="table-responsive" >
+  <table class="table table-striped">
+    <tbody>
+      <tr>
+	<th>Command</th>
+        <td>
+          {{activeData.stepRun.step.command}}
+        </td>
+      </tr>
+      <tr>
+	<th>Docker Image</th>
+	<td>
+          {{activeData.stepRun.step.environment.docker_image}}
+        </td>
+      </tr>
+      <tr>
+	<th>Cores</th>
+        <td>
+          {{activeData.stepRun.step.resources.cores}}
+        </td>
+      </tr>
+      <tr>
+        <th>Memory</th>
+        <td>
+          {{activeData.stepRun.step.resources.memory}}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

@@ -18,7 +18,7 @@ DAEMON_EXECUTABLE = os.path.abspath(
 
 def is_server_running(master_url):
     try:
-        response = requests.get(master_url + '/api/status')
+        response = requests.get(master_url + '/api/status/')
         if response.status_code == 200:
             return True
         else:

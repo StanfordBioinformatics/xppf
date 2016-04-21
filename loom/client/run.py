@@ -63,7 +63,7 @@ class FileInputProcessor(AbstractInputProcessor):
                           'Using the local file.')
         # Input is from local source, not server. Upload it now.
         source_record_text = FileUploader.prompt_for_source_record_text(input_file)
-        data_object = self.filehandler.upload_file_from_local_path(input_file, source_record=source_record_text)
+        data_object = self.filehandler.import_file_from_local_path(input_file, source_record=source_record_text)
         return data_object
 
     def _get_input_from_server(self, input_id):

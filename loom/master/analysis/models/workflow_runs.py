@@ -1,4 +1,5 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 from analysis.exceptions import *
 from analysis.models.base import AnalysisAppInstanceModel, AnalysisAppImmutableModel
 from analysis.models.data_objects import DataObject
@@ -43,8 +44,6 @@ class WorkflowRun(AnalysisAppInstanceModel):
     def update_status(self):
         for step_run in self.step_runs.filter(status='waiting') | self.step_runs.filter(status='running'):
             step_run.update_status()
-        for output in self.workflow_run_outputs.all():
-            output.update_status()
         step_run_statuses = [step_run.status for step_run in self.step_runs.all()]
         if all([status == 'completed' for status in step_run_statuses]):
             self.update({'status': 'completed'})
@@ -74,6 +73,62 @@ class WorkflowRun(AnalysisAppInstanceModel):
         # TODO Assign workflow status (probably w/ default field)
         return workflow_run
 
+    @classmethod
+    def validate_create_input(cls, workflow_run_struct):
+        # Structure will be validated by creating object.
+        # However, channels are implicitly defined, and we have to validate to avoid
+        # confusing errors creating channels.
+
+        # First get a list of to_channel names and make sure there are no duplicates
+        def add_input(channel_inputs, channel_name):
+            if channel_name in channel_inputs:
+                raise Exception("The channel '%s' has two data sources. Only one is allowed." % channel_name)
+            channel_inputs.append(channel_name)
+            
+        channel_inputs = []
+        if workflow_run_struct.get('workflow_run_inputs') is not None:
+            for workflow_run_input in workflow_run_struct['workflow_run_inputs']:
+                if workflow_run_input.get('workflow_input') is None:
+                    raise Exception('workflow_run_input definition is missing a workflow_input. %s' % workflow_run_input)
+                if workflow_run_input['workflow_input'].get('to_channel') is None:
+                    raise Exception('workflow_input is missing channel. %s' % workflow_run_input['workflow_input'])
+                channel_name = workflow_run_input['workflow_input']['to_channel']
+                add_input(channel_inputs, channel_name)
+        if workflow_run_struct.get('workflow') is None:
+            raise Exception('WorkflowRun definition is invalid. Missing workflow. %s' % workflow_run_struct)
+        if workflow_run_struct['workflow']['steps'] is None:
+            raise Exception('Workflow definition is invalid. Missing steps. %s' % workflow_run_struct['workflow'])
+        for step in workflow_run_struct['workflow']['steps']:
+            if step.get('step_outputs') is None:
+                raise Exception('Step definition is invalid, missing step_outputs. %s' % step)
+            for step_output in step['step_outputs']:
+                if step_output.get('to_channel') is None:
+                    raise Exception('step_output definition is invalid. Missing "to_channel". %s' % step_output)
+                channel_name = step_output['to_channel']
+                add_input(channel_inputs, channel_name)
+
+        # Now verify that every from_channel has a source channel defined
+        def check_source(channel_inputs, channel_name):
+            if channel_name not in channel_inputs:
+                raise Exception("from_channel '%s' is defined, but it has no source. "\
+                                "There should be a corresponding workflow_input or a step_output with to_channel '%s'"
+                                % (channel_name, channel_name))
+
+        if workflow_run_struct['workflow'].get('workflow_outputs') is None:
+            raise Exception('Invalid workflow, missing workflow_outputs. %s' % workflow_run_struct['workflow'])
+        for workflow_output in  workflow_run_struct['workflow']['workflow_outputs']:
+            if workflow_output.get('from_channel') is None:
+                raise Exception('Invalid workflow output, from_channel is missing. %s' % workflow_output)
+            channel_name = workflow_output['from_channel']
+            check_source(channel_inputs, channel_name)
+        for step in workflow_run_struct['workflow']['steps']:
+            if step.get('step_inputs') is not None:
+                for step_input in step['step_inputs']:
+                    if step_input.get('from_channel') is None:
+                        raise Exception('step_input definition is invalid. Missing "from_channel". %s' % step_input)
+                    channel_name = step_input.get('from_channel')
+                    check_source(channel_inputs, channel_name)
+                
     def _sync_outputs(self):
         for workflow_output in self.workflow.workflow_outputs.all():
             self._sync_output(workflow_output)
@@ -103,7 +158,10 @@ class WorkflowRun(AnalysisAppInstanceModel):
             return
         except ObjectDoesNotExist:
             step_run = StepRun.create(
-                {'step': step.to_struct()}
+                {'step': step.to_struct(),
+                 'workflow_name': self.workflow.workflow_name,
+                 'workflow_run_datetime_created': self.datetime_created
+                }
             )
             self.step_runs.add(step_run)
             for step_input in step_run.step.step_inputs.all():
@@ -243,6 +301,8 @@ class StepRun(AnalysisAppInstanceModel):
     step_run_inputs = fields.OneToManyField('StepRunInput')
     step_run_outputs = fields.OneToManyField('StepRunOutput')
     task_runs = fields.OneToManyField('TaskRun')
+    workflow_name = fields.CharField(max_length=255, default='')
+    workflow_run_datetime_created = fields.DateTimeField(default=timezone.now) 
     status = fields.CharField(
         max_length=255,
         default='waiting',
@@ -315,7 +375,10 @@ class StepRun(AnalysisAppInstanceModel):
         task_run = TaskRun.create({
             'task_run_inputs': task_run_inputs,
             'task_run_outputs': task_run_outputs,
-            'task_definition': task_definition
+            'task_definition': task_definition,
+            'step_name': self.step.step_name,
+            'workflow_name': self.workflow_name,
+            'workflow_run_datetime_created': self.workflow_run_datetime_created
         })
         
         self.task_runs.add(task_run)
