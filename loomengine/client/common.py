@@ -123,13 +123,11 @@ def get_gcloud_hosts():
 def get_server_url():
     # TODO: add PROTOCOL and EXTERNAL PORT to server.ini since they are required to construct a URL to reach the server
     # Consider how to keep in sync with user-provided settings, default_settings.ini, and _deploy_settings.ini
-    # Would remove dependency on SettingsManger from other components
-    settings_manager = loomengine.client.settings_manager.SettingsManager()
+    # Would remove dependency on settings_manager from other components
     try:
-        settings_manager.load_deploy_settings_file()
+        settings = loomengine.client.settings_manager.read_deploy_settings_file()
     except:
         raise Exception("Could not open server deploy settings. Do you need to run \"loom server create\" first?")
-    settings = settings_manager.settings
     protocol = settings['PROTOCOL']
     if settings.get('CLIENT_USES_SERVER_INTERNAL_IP') == 'True':
         ip = get_server_private_ip()
@@ -137,9 +135,6 @@ def get_server_url():
         ip = get_server_public_ip()
     port = settings['EXTERNAL_PORT']
     return '%s://%s:%s' % (protocol, ip, port)
-
-def get_deploy_settings_filename():
-    return os.path.expanduser(os.path.join(LOOM_SETTINGS_PATH, get_server_type() + '_deploy_settings.ini'))
 
 def is_server_running():
     try:
@@ -176,31 +171,26 @@ def check_for_gcloud():
     if not distutils.spawn.find_executable('gcloud'):
         raise Exception('Google Cloud SDK not found. Please install it from: https://cloud.google.com/sdk/')
 
-def setup_gce_ini_and_json():
-    """Creates gce.ini and a service account JSON credential if needed.
-    This involves REST calls which should be skipped if possible, both to
-    decrease latency and to avoid creating extraneous API keys.
-    """
-    if is_gce_ini_valid() and is_gce_json_valid():
-        return
-
+def create_gce_ini(email):
+    if not is_gce_json_valid():
+        raise Exception('Credential %s does not exist or is not valid for the current project. Please run "gcloud init" and ensure that the correct project is selected.' % GCE_JSON_PATH)
     project = get_gcloud_project()
     server_name = get_gcloud_server_name()
-    service_account_email = find_service_account_email(server_name)
+    print 'Creating %s...' % GCE_INI_PATH
+    config = ConfigParser.SafeConfigParser()
+    config.add_section('gce')
+    config.set('gce', 'gce_project_id', project)
+    config.set('gce', 'gce_service_account_email_address', email)
+    config.set('gce', 'gce_service_account_pem_file_path', GCE_JSON_PATH)
+    with open(os.path.expanduser(GCE_INI_PATH), 'w') as configfile:
+        config.write(configfile)
+    delete_libcloud_cached_credential() # Ensures that downstream steps get a new token with updated service account
 
-    if not is_gce_ini_valid():
-        print 'Creating or updating %s...' % GCE_INI_PATH
-        config = ConfigParser.SafeConfigParser()
-        config.add_section('gce')
-        config.set('gce', 'gce_project_id', project)
-        config.set('gce', 'gce_service_account_email_address', service_account_email)
-        config.set('gce', 'gce_service_account_pem_file_path', GCE_JSON_PATH)
-        with open(os.path.expanduser(GCE_INI_PATH), 'w') as configfile:
-            config.write(configfile)
+def create_gce_json(email):
+    project = get_gcloud_project()
 
-    if not is_gce_json_valid():
-        print 'Creating %s...' % GCE_JSON_PATH
-        create_service_account_key(project, service_account_email, GCE_JSON_PATH)
+    print 'Creating %s...' % GCE_JSON_PATH
+    create_service_account_key(project, email, GCE_JSON_PATH)
 
 def create_service_account_key(project, email, path):
     """Creates a service account key in the provided project, using the provided
@@ -342,8 +332,8 @@ def set_project_policy(policy, project=None):
     response = request.execute()
     return response
 
-def grant_editor_role(email=None):
-    """Grants the editor role to the specified service account in the current 
+def grant_roles(roles, email=None):
+    """Grants the specified roles to the specified service account in the current 
     project. If no email provided, defaults to account for the current instance.
     """
     if email == None:
@@ -352,10 +342,16 @@ def grant_editor_role(email=None):
     project = get_gcloud_project()
 
     # Set policy on service account
-    iam_service = get_iam_service()
-    request_body = {"policy": {"bindings": [{"role": "roles/editor", "members": ["serviceAccount:%s" % email]}]}}
-    request = iam_service.projects().serviceAccounts().setIamPolicy(resource='projects/%s/serviceAccounts/%s' % (project, email), body=request_body)
-    response = request.execute()
+
+    # iam_service = get_iam_service()
+
+    # bindings = []
+    # for role in roles:
+    #     bindings.append({"role": role, "members": ["serviceAccount:%s" % email]})
+
+    # request_body = {"policy": {"bindings": bindings}}
+    # request = iam_service.projects().serviceAccounts().setIamPolicy(resource='projects/%s/serviceAccounts/%s' % (project, email), body=request_body)
+    # response = request.execute()
 
     # Set policy on project
     policy = get_project_policy(project)
@@ -363,9 +359,15 @@ def grant_editor_role(email=None):
     with open(jsonfilename, 'w') as jsonfile:
         json.dump(policy, jsonfile)
     print 'Current project policy saved to %s' % jsonfilename
+    added_roles = []
     for binding in policy['bindings']:
-        if binding['role'] == 'roles/editor':
+        if binding['role'] in roles:
             binding['members'].append('serviceAccount:%s' % email)
+            added_roles.append(binding['role']) # mark as added
+    # if any specified roles not added, create and add new binding
+    for role in roles:
+        if role not in added_roles:
+            policy['bindings'].append({"role":role, "members": ["serviceAccount:%s" % email]})
     set_project_policy({"policy": policy}, project)
     
 def get_iam_service():
@@ -385,6 +387,13 @@ def get_crm_service():
 
     crm_service = googleapiclient.discovery.build('cloudresourcemanager', 'v1', credentials=credentials)
     return crm_service
+
+def delete_libcloud_cached_credential():
+    project = get_gcloud_project()
+    credential = os.path.expanduser('~/.google_libcloud_auth.%s' % project)
+    if os.path.exists(credential):
+        print 'Deleting %s...' % credential
+        os.remove(credential)
 
 def parse_as_json_or_yaml(text):
     def read_as_json(json_text):

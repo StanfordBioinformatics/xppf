@@ -1,10 +1,11 @@
   - name: Create SSH key if it doesn't exist
     user: name={{ remote_user }} generate_ssh_key=yes ssh_key_bits=2048 ssh_key_file={{ gce_ssh_key_file }} ssh_key_type=rsa
-  - name: Read SSH key
-    shell: cat "{{gce_ssh_key_file}}.pub"
-    register: public_key
+  - name: Read SSH key and create a metadata file from it
+    shell: "echo -n {{remote_user}}: | cat - {{gce_ssh_key_file}}.pub > {{gce_ssh_key_file}}.pub.metadata"
   - name: Add SSH key to instance metadata
-    shell: "gcloud compute instances add-metadata {{instance_name}} --zone {{zone}} --metadata ssh-keys=\"{{ remote_user }}: {{ public_key.stdout }}\""
+    shell: "gcloud compute instances add-metadata {{instance_name}} --zone {{zone}} --metadata-from-file ssh-keys={{gce_ssh_key_file}}.pub.metadata"
+  - name: Delete temporary instance metadata file.
+    file: path={{gce_ssh_key_file}}.pub.metadata state=absent
   - name: Wait for SSH port to be available.
     wait_for: host={{ (use_internal_ip) | ternary(item.private_ip, item.public_ip) }} port=22 delay=10 timeout=300 search_regex=OpenSSH
     with_items: '{{ gce_result.instance_data }}'
