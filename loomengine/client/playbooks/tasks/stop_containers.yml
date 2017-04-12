@@ -27,3 +27,8 @@
   docker_container:
     name: "{{ nginx_container_name }}"
     state: stopped
+
+- name: Stop the Fluentd server container
+  docker_container:
+    name: "{{ fluentd_container_name }}"
+    state: stopped

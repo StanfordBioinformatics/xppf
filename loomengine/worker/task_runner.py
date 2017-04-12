@@ -6,6 +6,7 @@ from datetime import datetime
 import docker
 import errno
 import json
+import logging
 import os
 import requests
 import string
@@ -18,8 +19,6 @@ import uuid
 import loomengine.utils
 from loomengine.utils.filemanager import FileManager
 from loomengine.utils.connection import Connection
-from loomengine.utils.logger import get_file_logger, get_stdout_logger
-from loomengine.utils.helper import init_directory
 
 
 class WorkerSettingsError(Exception):
@@ -54,7 +53,6 @@ class TaskRunner(object):
             'TASK_ATTEMPT_ID': args.task_attempt_id,
             'MASTER_URL': args.master_url,
             'LOG_LEVEL': args.log_level,
-            'LOG_FILE': args.log_file,
         }
 
         # Errors here can't be reported since there is no server connection
@@ -72,7 +70,7 @@ class TaskRunner(object):
             except Exception as e:
                 self.logger.error(
                     'Failed to initialize server connection: "%s"' % str(e))
-                raise e
+                raise
 
         # Errors here can be both logged and reported to server
 
@@ -92,16 +90,12 @@ class TaskRunner(object):
             except:
                 # Raise original error, not status change error
                 pass
-            raise e
+            raise
 
     def _init_loggers(self):
         log_level = self.settings['LOG_LEVEL']
-        #if self.settings['LOG_FILE'] is None:
         self.logger = get_stdout_logger(__name__, log_level)
         utils_logger = get_stdout_logger(loomengine.utils.__name__, log_level)
-        #else:
-        #    self.logger = get_file_logger(__name__, log_level, self.settings['LOG_FILE'], log_stdout_stderr=True)
-        #    utils_logger = get_file_logger(loomengine.utils.__name__, log_level, self.settings['LOG_FILE'], log_stdout_stderr=True)
 
     def _init_task_attempt(self):
         self.task_attempt = self.connection.get_task_attempt(self.settings['TASK_ATTEMPT_ID'])
@@ -175,16 +169,19 @@ class TaskRunner(object):
             self._try_to_get_returncode()
         except Exception as e:
             self.logger.error('Exiting run with error: %s' % str(e))
-            raise e
+            raise
 
     def _cleanup(self):
         # Never raise errors, so cleanup can continue
         self._timepoint('Saving outputs')
 
-        self._try_to_save_process_logs()
+        try:
+            self._save_process_logs()
+        except Exception as e:
+            self._fail('Failed to save process logs', detail=str(e))
 
         try:
-            self._try_to_save_outputs()
+            self._save_outputs()
         except Exception as e:
             self._fail('Failed to save outputs', detail=str(e))
 
@@ -203,7 +200,7 @@ class TaskRunner(object):
         except Exception as e:
             self._fail('Failed to copy inputs to workspace',
                        detail=str(e))
-            raise e
+            raise
 
     def _copy_inputs(self):
         if self.task_attempt.get('inputs') is None:
@@ -228,7 +225,7 @@ class TaskRunner(object):
             self._create_run_script()
         except Exception as e:
             self._fail('Failed to create run script', detail=str(e))
-            raise e
+            raise
 
     def _create_run_script(self):
         user_command = self.task_attempt['rendered_command']
@@ -252,7 +249,7 @@ class TaskRunner(object):
             self._fail(
                 'Failed to fetch image for runtime environment',
                 detail=str(e))
-            raise e
+            raise
 
 
     def _pull_image(self):
@@ -282,7 +279,7 @@ class TaskRunner(object):
             self._fail(
                 'Failed to create container for runtime environment',
                 detail=str(e))
-            raise e
+            raise
 
     def _create_container(self):
         docker_image = self._get_docker_image()
@@ -312,7 +309,7 @@ class TaskRunner(object):
             self._verify_container_started_running()
         except Exception as e:
             self._fail('Failed to start analysis', detail=str(e))
-            raise e
+            raise
 
     def _verify_container_started_running(self):
         status = self.docker_client.inspect_container(
@@ -363,15 +360,8 @@ class TaskRunner(object):
                           container_data['State'].get('Status')
                 raise Exception(message)
 
-    def _try_to_save_process_logs(self):
-        self.logger.debug('Saving process logs')
-        try:
-            self._save_process_logs()
-        except Exception as e:
-            self._fail('Failed to save process logs', detail=str(e))
-            # Don't raise error. Continue cleanup
-
     def _save_process_logs(self):
+        self.logger.debug('Saving process logs')
         try:
             self.container
         except AttributeError:
@@ -404,7 +394,7 @@ class TaskRunner(object):
             self.logger.error(message)
             raise FileImportError(message)
 
-    def _try_to_save_outputs(self):
+    def _save_outputs(self):
         try:
             self.container
         except AttributeError:
@@ -412,13 +402,7 @@ class TaskRunner(object):
             return # Never ran. No outputs to save
 
         self.logger.debug('Saving outputs')
-        try:
-            self._save_outputs()
-        except Exception as e:
-            self._fail('Failed to save outputs', detail=str(e))
-            # Don't raise error. Continue cleanup
 
-    def _save_outputs(self):
         for output in self.task_attempt['outputs']:
             if output['type'] == 'file':
                 filename = output['source']['filename']
@@ -432,6 +416,7 @@ class TaskRunner(object):
                     self._fail(
                         'Failed to save output file %s' % filename,
                         detail=str(e))
+                    raise
             else:
                 if output['source'].get('filename'):
                     with open(
@@ -541,11 +526,43 @@ class TaskRunner(object):
         return parser
 
 
+def init_directory(directory, new=False):
+    if new and os.path.exists(directory):
+        raise Exception('Directory %s already exists' % directory)
+    if os.path.exists(directory) and not os.path.isdir(directory):
+        raise Exception(
+            'Cannot initialize directory %s since a file exists with that name'
+            % directory)
+    try:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+    except OSError as e:
+        raise Exception('Failed to create directory %s. %s' % (directory, e.strerror))
+
+LOG_LEVELS = {
+    'CRITICAL': logging.CRITICAL,
+    'ERROR': logging.ERROR,
+    'WARNING': logging.WARNING,
+    'INFO': logging.INFO,
+    'DEBUG': logging.DEBUG,
+}
+
+def get_stdout_logger(name, log_level_string):
+    log_level = LOG_LEVELS[log_level_string.upper()]
+    logger = logging.getLogger(name)
+    logger.setLevel(log_level)
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(log_level)
+    logger.addHandler(stream_handler)
+    return logger
+
+    
 # pip entrypoint requires a function with no arguments
 def main():
 
     tr = TaskRunner()
     tr.run_with_heartbeats(tr.main)
+
 
 if __name__=='__main__':
     main()

@@ -1,0 +1,17 @@
+---
+name: simple
+command: echo {{ word_in }}
+environment:
+  docker_image: ubuntu
+resources:
+  cores: '1'
+  memory: '1'
+inputs:
+- type: string
+  hint: Enter a string value
+  channel: word_in
+outputs:
+- type: string
+  channel: word_out
+  source:
+    stream: stdout

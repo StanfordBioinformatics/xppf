@@ -31,6 +31,13 @@ ssl_cert_subj: "/C={{lookup('env', 'LOOM_SSL_CERT_C')}}/ST={{lookup('env', 'LOOM
 storage_type: "{{lookup('env','LOOM_STORAGE_TYPE')}}"
 storage_root: "{{lookup('env','LOOM_STORAGE_ROOT')}}"
 
+# Fluentd container settings
+fluentd_image: "{{lookup('env', 'LOOM_FLUENTD_IMAGE')}}"
+fluentd_container_name: "{{server_name}}\
+                        {{lookup('env', 'LOOM_FLUENTD_CONTAINER_NAME_SUFFIX')}}"
+fluentd_port: "{{lookup('env', 'LOOM_FLUENTD_PORT')}}"
+fluentd_output_plugin: "{{lookup('env', 'LOOM_FLUENTD_OUTPUT_PLUGIN')}}"
+
 # MySQL container settings
 mysql_create_docker_container: "{{lookup('env', 'LOOM_MYSQL_CREATE_DOCKER_CONTAINER') | bool}}"
 mysql_image: "{{lookup('env', 'LOOM_MYSQL_IMAGE')}}"
@@ -54,7 +61,8 @@ container_mysql_ssl_client_cert_path: "{{container_settings_home+'/'+admin_files
 container_mysql_ssl_client_key_path: "{{container_settings_home+'/'+admin_files_dir+'/'+client_key_file if client_key_file else none}}"
 
 # Rabbitmq container settings
-rabbitmq_image: "{{lookup('env', 'LOOM_RABBITMQ_IMAGE')}}"
+rabbitmq_image: "{{lookup('env', 'LOOM_RABBITMQ_MANAGEMENT_IMAGE') if debug else \
+                 lookup('env', 'LOOM_RABBITMQ_IMAGE')}}"
 rabbitmq_container_name: "\
   {{server_name}}\
   {{lookup('env', 'LOOM_RABBITMQ_CONTAINER_NAME_SUFFIX')}}"
@@ -74,16 +82,19 @@ scheduler_container_name: "\
   {{server_name}}\
   {{lookup('env', 'LOOM_SCHEDULER_CONTAINER_NAME_SUFFIX')}}"
 
+# Flower container settings
+flower_container_name: "\
+  {{server_name}}\
+  {{lookup('env', 'LOOM_FLOWER_CONTAINER_NAME_SUFFIX')}}"
+flower_internal_port: "{{lookup('env', 'LOOM_FLOWER_INTERNAL_PORT')}}"
+
 # NGINX container settings
 nginx_image: "{{lookup('env', 'LOOM_NGINX_IMAGE')}}"
 nginx_container_name: "\
   {{server_name}}\
   {{lookup('env', 'LOOM_NGINX_CONTAINER_NAME_SUFFIX')}}"
-nginx_conf_file: nginx.conf
 nginx_server_name: "{{lookup('env', 'LOOM_NGINX_SERVER_NAME')}}"
 nginx_webportal_root: "{{lookup('env', 'LOOM_NGINX_WEBPORTAL_ROOT')}}"
-nginx_access_log: "{{lookup('env', 'LOOM_NGINX_ACCESS_LOG')}}"
-nginx_error_log: "{{lookup('env', 'LOOM_NGINX_ERROR_LOG')}}"
 
 # Loom master container settings
 master_container_name: "\

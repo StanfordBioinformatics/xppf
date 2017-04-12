@@ -4,7 +4,7 @@ from rest_framework import serializers
 from .base import SuperclassModelSerializer, CreateWithParentModelSerializer
 from api.models.data_objects import StringDataObject, BooleanDataObject, \
     IntegerDataObject, FloatDataObject, FileDataObject, DataObject, \
-    FileResource, DataObjectArray
+    FileResource, ArrayDataObject
 
 
 class UpdateNotAllowedError(Exception):
@@ -16,9 +16,10 @@ class BooleanDataObjectSerializer(serializers.HyperlinkedModelSerializer):
 
     uuid = serializers.CharField(required=False)
     url = serializers.HyperlinkedIdentityField(
-        view_name='data-object-detail',
+        view_name='data-boolean-detail',
         lookup_field='uuid'
     )
+    value = serializers.BooleanField(required=True)
     
     class Meta:
         model = BooleanDataObject
@@ -29,7 +30,7 @@ class IntegerDataObjectSerializer(serializers.HyperlinkedModelSerializer):
 
     uuid = serializers.CharField(required=False)
     url = serializers.HyperlinkedIdentityField(
-        view_name='data-object-detail',
+        view_name='data-integer-detail',
         lookup_field='uuid'
     )
     
@@ -42,7 +43,7 @@ class FloatDataObjectSerializer(serializers.HyperlinkedModelSerializer):
 
     uuid = serializers.CharField(required=False)
     url = serializers.HyperlinkedIdentityField(
-        view_name='data-object-detail',
+        view_name='data-float-detail',
         lookup_field='uuid'
     )
     
@@ -55,7 +56,7 @@ class StringDataObjectSerializer(serializers.HyperlinkedModelSerializer):
 
     uuid = serializers.CharField(required=False)
     url = serializers.HyperlinkedIdentityField(
-        view_name='data-object-detail',
+        view_name='data-string-detail',
         lookup_field='uuid'
     )
     
@@ -71,10 +72,14 @@ class FileResourceSerializer(serializers.HyperlinkedModelSerializer):
         view_name='file-resource-detail',
         lookup_field='uuid'
     )
-    
+    upload_status = serializers.ChoiceField(
+        choices=FileResource.FILE_RESOURCE_UPLOAD_STATUS_CHOICES,
+        required=True)
+
     class Meta:
         model = FileResource
         fields = ('uuid', 'url', 'datetime_created', 'file_url', 'md5', 'upload_status')
+
 
 class FileDataObjectSerializer(serializers.ModelSerializer):
 
@@ -82,10 +87,12 @@ class FileDataObjectSerializer(serializers.ModelSerializer):
     file_resource = FileResourceSerializer(allow_null=True, required=False)
     file_import = serializers.JSONField(required=False, allow_null=True)
     url = serializers.HyperlinkedIdentityField(
-        view_name='data-object-detail',
+        view_name='data-file-detail',
         lookup_field='uuid'
     )
-    
+    datetime_created = serializers.CharField(required=False)
+    source_type=serializers.ChoiceField(choices=FileDataObject.FILE_SOURCE_TYPE_CHOICES)
+
     class Meta:
         model = FileDataObject
         fields = ('uuid', 'url', 'file_resource', 'file_import', 'type',
@@ -96,7 +103,6 @@ class FileDataObjectSerializer(serializers.ModelSerializer):
             validated_data['file_resource'] = self._create_file_resource(
                 self.initial_data.get('file_resource'))
         file_data_object = self.Meta.model.objects.create(**validated_data)
-        file_data_object.initialize()
         return file_data_object
 
     def _create_file_resource(self, resource_data):
@@ -107,7 +113,7 @@ class FileDataObjectSerializer(serializers.ModelSerializer):
         return s.save()
 
     def update(self, instance, validated_data):
-        instance = instance.filedataobject
+        instance = instance.filedataobject # downcast
         if self.initial_data.get('file_resource'):
             if instance.file_resource:
                 validated_data['file_resource'] = self._update_file_resource(
@@ -116,9 +122,7 @@ class FileDataObjectSerializer(serializers.ModelSerializer):
             else:
                 validated_data['file_resource'] = self._create_file_resource(
                     self.initial_data.get('file_resource'))
-        for field, value in validated_data.iteritems():
-            setattr(instance, field, value)
-        instance.save()
+        instance = instance.setattrs_and_save_with_retries(validated_data)
         return instance
 
     def _update_file_resource(self, instance, resource_data):
@@ -164,9 +168,9 @@ class DataObjectSerializer(SuperclassModelSerializer):
 
     def _get_subclass_serializer_class(self, type):
         # This has to be defined in a function due to circular dependency
-        # DataObjectArraySerializer.members uses DataObjectSerializer.
+        # ArrayDataObjectSerializer.members uses DataObjectSerializer.
         if type == 'array':
-            return DataObjectArraySerializer
+            return ArrayDataObjectSerializer
         elif not type:
             return DataObjectSerializer
         else:
@@ -206,17 +210,17 @@ class DataObjectUuidSerializer(serializers.HyperlinkedModelSerializer):
                   'url',)
 
 
-class DataObjectArraySerializer(serializers.HyperlinkedModelSerializer):
+class ArrayDataObjectSerializer(serializers.HyperlinkedModelSerializer):
 
     uuid = serializers.CharField(required=False)
     members = DataObjectSerializer(many=True, required=False)
     url = serializers.HyperlinkedIdentityField(
-        view_name='data-object-detail',
+        view_name='data-array-detail',
         lookup_field='uuid'
     )
 
     class Meta:
-        model = DataObjectArray
+        model = ArrayDataObject
         exclude = ('_change',)
 
     def create(self, validated_data):
@@ -238,7 +242,7 @@ class DataObjectArraySerializer(serializers.HyperlinkedModelSerializer):
     def validate_is_array(self, value):
         if value == False:
             raise serializers.ValidationError(
-                'DataObjectArraySerializer cannot be used if is_array=False')
+                'ArrayDataObjectSerializer cannot be used if is_array=False')
         return value
 
     def validate(self, data):

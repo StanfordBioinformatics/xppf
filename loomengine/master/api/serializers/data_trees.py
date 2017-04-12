@@ -1,15 +1,16 @@
 import copy
+from django.db import models
 import jsonschema
-
 from rest_framework import serializers
 
 from .data_objects import DataObjectSerializer
-from api.models.data_trees import *
+from api.models.data_trees import DataTreeNode
 from api.models.data_objects import DataObject
 from api.validation_schemas.data_trees import data_tree_schema
 from api.exceptions import NoFileMatchError, MultipleFileMatchesError
 
-class DataNodeSerializer(serializers.HyperlinkedModelSerializer):
+
+class DataTreeNodeSerializer(serializers.HyperlinkedModelSerializer):
 
     MISSING_BRANCH_VALUE = None
     EMPTY_BRANCH_VALUE = []
@@ -28,7 +29,7 @@ class DataNodeSerializer(serializers.HyperlinkedModelSerializer):
     )
 
     class Meta:
-        model = DataNode
+        model = DataTreeNode
         fields = ('uuid', 'url', 'contents',)
 
     def create(self, validated_data):
@@ -37,7 +38,7 @@ class DataNodeSerializer(serializers.HyperlinkedModelSerializer):
             raise Exception('data type must be set in serializer context')
         contents = self.initial_data.get('contents')
         if contents is None:
-            raise Exception('no data contents. Cannot create DataNode')
+            raise Exception('no data contents. Cannot create DataTreeNode')
         return self._create_data_tree_from_data_objects(
                 contents, type)
 
@@ -46,8 +47,8 @@ class DataNodeSerializer(serializers.HyperlinkedModelSerializer):
             return super(self.__class__, self).to_representation(
                 self.initial_data)
         else:
-            assert isinstance(instance, DataNode)
-            repr = super(DataNodeSerializer, self).to_representation(instance)
+            assert isinstance(instance, DataTreeNode)
+            repr = super(DataTreeNodeSerializer, self).to_representation(instance)
             repr.update({'contents': self._data_tree_to_data_struct(instance)})
             return repr
 
@@ -104,33 +105,33 @@ class DataNodeSerializer(serializers.HyperlinkedModelSerializer):
         return minheight + 1
 
     def _create_data_tree_from_data_objects(self, contents, data_type):
-        data_node = DataNode.objects.create()
-        data_node.root_node = data_node
-        data_node.save()
-        self._add_data_objects(data_node, contents, data_type)
-        return data_node
+        data_tree_node = DataTreeNode.objects.create()
+        data_tree_node.root_node = data_tree_node
+        data_tree_node.save()
+        self._add_data_objects(data_tree_node, contents, data_type)
+        return data_tree_node
 
-    def _add_data_objects(self, data_node, contents, data_type):
+    def _add_data_objects(self, data_tree_node, contents, data_type):
         path = []
         self._extend_all_paths_and_add_data_at_leaves(
-            data_node, contents, path, data_type)
+            data_tree_node, contents, path, data_type)
 
-    def _data_tree_to_data_struct(self, data_node):
-        if data_node._is_missing_branch():
+    def _data_tree_to_data_struct(self, data_tree_node):
+        if data_tree_node._is_missing_branch():
             return self.MISSING_BRANCH_VALUE
-        elif data_node._is_empty_branch():
+        elif data_tree_node._is_empty_branch():
             return self.EMPTY_BRANCH_VALUE
-        if data_node._is_leaf():
-            s = DataObjectSerializer(data_node.data_object, context=self.context)
+        if data_tree_node._is_leaf():
+            s = DataObjectSerializer(data_tree_node.data_object, context=self.context)
             return s.data
         else:
-            contents = [self.MISSING_BRANCH_VALUE] * data_node.degree
-            for child in data_node.children.all():
+            contents = [self.MISSING_BRANCH_VALUE] * data_tree_node.degree
+            for child in data_tree_node.children.all():
                 contents[child.index] = self._data_tree_to_data_struct(child)
             return contents
 
     def _extend_all_paths_and_add_data_at_leaves(
-            self, data_node, contents, path, data_type):
+            self, data_tree_node, contents, path, data_type):
         # Recursive function that extends 'path' until reaching a leaf node,
         # where data is finally added.
         # 'path' is the partial path to some intermediate
@@ -159,21 +160,21 @@ class DataNodeSerializer(serializers.HyperlinkedModelSerializer):
                     raise serializers.ValidationError(e.message)
                 except MultipleFileMatchesError as e:
                     raise serializers.ValidationError(e.message)
-            data_node.add_data_object(path, data_object)
+            data_tree_node.add_data_object(path, data_object)
             return
         elif len(contents) == 0:
             # An empty list represents a node of degree 0
-            data_node.degree = 0
-            data_node.save()
+            data_tree_node.degree = 0
+            data_tree_node.save()
         else:
             for i in range(len(contents)):
                 path_i = copy.deepcopy(path)
                 path_i.append((i, len(contents)))
                 self._extend_all_paths_and_add_data_at_leaves(
-                    data_node, contents[i], path_i, data_type)
+                    data_tree_node, contents[i], path_i, data_type)
 
 
-class ExpandableDataNodeSerializer(DataNodeSerializer):
+class ExpandableDataTreeNodeSerializer(DataTreeNodeSerializer):
 
     uuid = serializers.UUIDField(required=False)
     url = serializers.HyperlinkedIdentityField(
@@ -182,14 +183,15 @@ class ExpandableDataNodeSerializer(DataNodeSerializer):
     )
 
     class Meta:
-        model = DataNode
+        model = DataTreeNode
         fields = ('uuid',
                   'url',
         )
 
     def to_representation(self, instance):
         if self.context.get('expand'):
-            return super(ExpandableDataNodeSerializer, self).to_representation(instance)
+            return super(ExpandableDataTreeNodeSerializer, self)\
+                .to_representation(instance)
         else:
             return serializers.HyperlinkedModelSerializer.to_representation(
                 self, instance)

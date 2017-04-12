@@ -24,7 +24,10 @@ def to_list(value):
     if value is None:
         return []
     value = value.strip(' "\'')
-    list = value.lstrip('[').rstrip(']').split(',')
+    list_str = value.lstrip('[').rstrip(']')
+    if list_str == '':
+        return []
+    list = list_str.split(',')
     return [item.strip(' "\'') for item in list]
 
 SETTINGS_DIR = os.path.dirname(__file__)
@@ -39,8 +42,10 @@ SECRET_KEY = os.getenv(
     ''.join([random.SystemRandom()\
              .choice('abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)')
              for i in range(50)]))
-CORS_ORIGIN_ALLOW_ALL = to_boolean(os.getenv('LOOM_MASTER_CORS_ORIGIN_ALLOW_ALL'))
-CORS_ORIGIN_WHITELIST = to_list(os.getenv('LOOM_MASTER_CORS_ORIGIN_WHITELIST'))
+CORS_ORIGIN_ALLOW_ALL = to_boolean(
+    os.getenv('LOOM_MASTER_CORS_ORIGIN_ALLOW_ALL', 'False'))
+CORS_ORIGIN_WHITELIST = to_list(os.getenv('LOOM_MASTER_CORS_ORIGIN_WHITELIST', '[]'))
+
 ALLOWED_HOSTS = to_list(os.getenv('LOOM_MASTER_ALLOWED_HOSTS', '[*]'))
 
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'WARNING').upper()
@@ -56,7 +61,6 @@ LOOM_STORAGE_ROOT = os.path.expanduser(os.getenv('LOOM_STORAGE_ROOT', '~/loom-da
 FILE_ROOT_FOR_WORKER = os.path.expanduser(
     os.getenv('FILE_ROOT_FOR_WORKER', LOOM_STORAGE_ROOT))
 
-LOG_DIR = os.path.expanduser(os.getenv('LOOM_LOG_DIR', '/var/log/loom/'))
 LOOM_SETTINGS_PATH = os.path.expanduser(os.getenv('LOOM_SETTINGS_PATH','~/.loom/'))
 TASKRUNNER_HEARTBEAT_INTERVAL_SECONDS = os.getenv('LOOM_TASKRUNNER_HEARTBEAT_INTERVAL_SECONDS', '60')
 TASKRUNNER_HEARTBEAT_TIMEOUT_SECONDS = os.getenv('LOOM_TASKRUNNER_HEARTBEAT_TIMEOUT_SECONDS', '300')
@@ -127,9 +131,13 @@ KEEP_DUPLICATE_FILES = True
 FORCE_RERUN = True
 
 # For testing only
-TEST_DISABLE_TASK_DELAY = to_boolean(os.getenv('TEST_DISABLE_TASK_DELAY', False))
-TEST_NO_AUTOSTART_RUNS = to_boolean(os.getenv('TEST_NO_AUTOSTART_RUNS'))
+TEST_DISABLE_ASYNC_DELAY = to_boolean(os.getenv('TEST_DISABLE_ASYNC_DELAY', False))
+TEST_NO_TASK_CREATION = to_boolean(os.getenv('TEST_NO_TASK_CREATION', False))
+TEST_NO_RUN_TASK_ATTEMPT = to_boolean(os.getenv('TEST_NO_RUN_TASK_ATTEMPT', False))
 TEST_NO_POSTPROCESS = to_boolean(os.getenv('TEST_NO_POSTPROCESS', False))
+TEST_NO_PUSH_INPUTS_ON_RUN_CREATION = to_boolean(os.getenv(
+    'TEST_NO_PUSH_INPUTS_ON_RUN_CREATION', False))
+
 
 # Fixed settings
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -146,6 +154,8 @@ CELERY_BROKER_URL = 'amqp://%s:%s@%s:%s/%s' \
                     % (LOOM_RABBITMQ_USER, LOOM_RABBITMQ_PASSWORD,
                        LOOM_RABBITMQ_HOST, LOOM_RABBITMQ_PORT,
                        LOOM_RABBITMQ_VHOST)
+CELERY_BROKER_POOL_LIMIT = 50
+CELERYD_TASK_SOFT_TIME_LIMIT = 60
 
 INSTALLED_APPS = [
     'django.contrib.auth',
@@ -156,6 +166,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
+    'rest_framework_swagger',
     'django_celery_results',
     'api',
 ]
@@ -224,7 +235,6 @@ def _get_mysql_databases():
             'NAME': LOOM_MYSQL_DATABASE,
             'USER': LOOM_MYSQL_USER,
             'PORT': LOOM_MYSQL_PORT,
-            'CONN_MAX_AGE': 600,
         }
     }
 
@@ -270,28 +280,6 @@ if len(sys.argv) > 1 and sys.argv[1] == 'test':
 else:
     DISABLE_LOGGING = False
 
-if not DISABLE_LOGGING:
-    if not os.path.exists(LOG_DIR):
-        os.makedirs(LOG_DIR)
-
-def _get_django_handler():
-    django_logfile = os.path.join(LOG_DIR, 'loom_django.log')
-    handler = {
-        'class': 'logging.FileHandler',
-        'filename': django_logfile,
-        'formatter': 'default',
-    }
-    return handler
-
-def _get_loomengine_handler():
-    master_logfile = os.path.join(LOG_DIR, 'loom_master.log')
-    handler = {
-        'class': 'logging.FileHandler',
-        'filename': master_logfile,
-        'formatter': 'default',
-    }
-    return handler
-
 if DISABLE_LOGGING:
     LOGGING = {}
 else:
@@ -304,28 +292,26 @@ else:
             },
         },
         'handlers': {
-            'django_handler': _get_django_handler(),
-            'loomengine_handler': _get_loomengine_handler(),
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'default',
+            }
         },
         'loggers': {
             'django': {
-                'handlers': ['django_handler'],
+                'handlers': ['console'],
                 'level': LOG_LEVEL,
             },
             'loomengine': {
-                'handlers': ['loomengine_handler'],
+                'handlers': ['console'],
                 'level': LOG_LEVEL,
             },
             'api': {
-                'handlers': ['loomengine_handler'],
+                'handlers': ['console'],
                 'level': LOG_LEVEL,
             },
         },
     }
-
-if len(sys.argv) > 1 and sys.argv[1] == 'test':
-    LOGGING = False
-    #logging.disable(logging.CRITICAL)
 
 STATIC_URL = '/%s/' % os.path.basename(STATIC_ROOT)
 STATICFILES_DIRS = [

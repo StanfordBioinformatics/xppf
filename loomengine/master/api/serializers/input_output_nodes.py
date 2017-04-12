@@ -3,7 +3,7 @@ from django.db import models
 
 from .base import CreateWithParentModelSerializer
 from api.models.input_output_nodes import InputOutputNode
-from .data_trees import ExpandableDataNodeSerializer
+from .data_trees import ExpandableDataTreeNodeSerializer
 
 
 class InputOutputNodeSerializer(CreateWithParentModelSerializer):
@@ -18,11 +18,11 @@ class InputOutputNodeSerializer(CreateWithParentModelSerializer):
             type = validated_data.get('type')
             if not type:
                 raise Exception('data type is required')
-            data_node_serializer = ExpandableDataNodeSerializer(
+            data_tree_node_serializer = ExpandableDataTreeNodeSerializer(
                 data=data,
                 context = {'type': type})
-            data_node_serializer.is_valid(raise_exception=True)
-            data_root = data_node_serializer.save()
+            data_tree_node_serializer.is_valid(raise_exception=True)
+            data_root = data_tree_node_serializer.save()
             io_node.data_root = data_root
             io_node.save()
 
@@ -39,10 +39,11 @@ class InputOutputNodeSerializer(CreateWithParentModelSerializer):
             representation = super(InputOutputNodeSerializer, self)\
                 .to_representation(instance)
             if instance.data_root is not None:
-                data_node_serializer = ExpandableDataNodeSerializer(instance.data_root,
-                                                          context=self.context)
+                data_tree_node_serializer = ExpandableDataTreeNodeSerializer(
+                    instance.data_root,
+                    context=self.context)
                 try:
-                    representation['data'] = data_node_serializer.data
+                    representation['data'] = data_tree_node_serializer.data
                 except:
                     # Avoid raising exceptions when serializing
                     pass

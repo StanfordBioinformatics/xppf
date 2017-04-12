@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from django.db import transaction
 
 from api.exceptions import *
 from .base import CreateWithParentModelSerializer, SuperclassModelSerializer
@@ -50,10 +49,10 @@ class TaskAttemptOutputSerializer(CreateWithParentModelSerializer):
                     # We can't use the serializer because it fails to initialize
                     # the file data object when it isn't attached to a
                     # task_attempt_output
-                    instance.data_object = FileDataObject.objects.create(
+                    data_object = FileDataObject.objects.create(
                         **data_object_data)
-                    instance.save()
-                    instance.data_object.initialize()
+                    instance = instance.setattrs_and_save_with_retries(
+                        {'data_object': data_object})
                 else:
                     s = DataObjectSerializer(data=data_object_data)
                     s.is_valid(raise_exception=True)
@@ -69,11 +68,15 @@ class TaskAttemptOutputSerializer(CreateWithParentModelSerializer):
 
 class TaskAttemptLogFileSerializer(CreateWithParentModelSerializer):
 
+    uuid = serializers.CharField(required=False)
+    url = serializers.HyperlinkedIdentityField(
+        view_name='task-attempt-log-file-detail',
+        lookup_field='uuid')
     file = DataObjectSerializer(allow_null=True, required=False)
 
     class Meta:
         model = TaskAttemptLogFile
-        fields = ('log_name', 'file',)
+        fields = ('uuid', 'url', 'log_name', 'file', 'datetime_created')
 
 
 class TaskAttemptTimepointSerializer(CreateWithParentModelSerializer):
@@ -108,7 +111,6 @@ class TaskAttemptSerializer(serializers.HyperlinkedModelSerializer):
                   'rendered_command', 'environment', 'resources', 'timepoints')
 
 
-    @transaction.atomic
     def update(self, instance, validated_data):
         instance = self.Meta.model.objects.get(uuid=instance.uuid)
         # Only updates to status message fields,
@@ -117,13 +119,14 @@ class TaskAttemptSerializer(serializers.HyperlinkedModelSerializer):
         status_is_failed = validated_data.pop('status_is_failed', None)
         status_is_running = validated_data.pop('status_is_running', None)
 
+        attributes = {}
         if status_is_finished is not None:
-            instance.status_is_finished = status_is_finished
+            attributes['status_is_finished'] = status_is_finished
         if status_is_failed is not None:
-            instance.status_is_failed = status_is_failed
+            attributes['status_is_failed'] = status_is_failed
         if status_is_running is not None:
-            instance.status_is_running = status_is_running
-        instance.save()
+            attributes['status_is_running'] = status_is_running
+        instance = instance.setattrs_and_save_with_retries(attributes)
         return instance
 
 
@@ -198,6 +201,7 @@ class TaskSerializer(serializers.HyperlinkedModelSerializer):
     attempt_number = serializers.IntegerField(read_only=True)
     timepoints = TaskTimepointSerializer(
         many=True, allow_null=True, required=False)
+    index = serializers.JSONField(required=True)
 
     class Meta:
         model = Task
@@ -223,6 +227,7 @@ class TaskSerializer(serializers.HyperlinkedModelSerializer):
             'status_is_running',
             'attempt_number',
             'timepoints',
+            'index',
         )
 
 

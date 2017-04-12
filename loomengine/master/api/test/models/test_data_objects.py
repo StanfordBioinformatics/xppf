@@ -1,5 +1,6 @@
 import os
 from django.test import TestCase
+
 from api.models.data_objects import *
 
 
@@ -113,7 +114,7 @@ class TestFileDataObject(TestCase):
     def testIsReady(self):
         with self.settings(
                 KEEP_DUPLICATE_FILES=True):
-            self.file.initialize()
+            self.file.initialize_file_resource()
 
         self.assertFalse(self.file.is_ready())
         self.file.file_resource.upload_status = 'complete'
@@ -124,8 +125,8 @@ class TestFileDataObject(TestCase):
     def testCreateIncompleteResourceForImportKeepDuplicateTrue(self):
         with self.settings(
                 KEEP_DUPLICATE_FILES=True):
-            self.file.initialize()
-            self.file_copy.initialize()
+            self.file.initialize_file_resource()
+            self.file_copy.initialize_file_resource()
 
         # Files should have separate resources, even if contents match
         self.assertNotEqual(self.file.file_resource.uuid,
@@ -134,8 +135,8 @@ class TestFileDataObject(TestCase):
     def testCreateIncompleteResourceForImportKeepDuplicateFalseUploadIncomplete(self):
         with self.settings(
                 KEEP_DUPLICATE_FILES=False):
-            self.file.initialize()
-            self.file_copy.initialize()
+            self.file.initialize_file_resource()
+            self.file_copy.initialize_file_resource()
 
         # Files with matching content should not share a resource
         # unless upload is complete
@@ -145,10 +146,10 @@ class TestFileDataObject(TestCase):
     def testCreateIncompleteResourceForImportKeepDuplicateFalseUploadComplete(self):
         with self.settings(
                 KEEP_DUPLICATE_FILES=False):
-            self.file.initialize()
+            self.file.initialize_file_resource()
             self.file.file_resource.upload_status = 'complete'
             self.file.file_resource.save()
-            self.file_copy.initialize()
+            self.file_copy.initialize_file_resource()
 
         # Files with matching content should share a resource
         # provided upload on first resource was complete
@@ -347,10 +348,10 @@ class TestArrayDataObject(TestCase):
             DataObject.get_by_value(i, 'integer')
             for i in values
         ]
-        data_object_array = DataObjectArray.create_from_list(
+        array_data_object = ArrayDataObject.create_from_list(
             data_object_list, 'integer')
 
-        self.assertEqual(data_object_array.substitution_value, values)
+        self.assertEqual(array_data_object.substitution_value, values)
 
     def testIsReady(self):
         values = [1,2,3]
@@ -358,9 +359,9 @@ class TestArrayDataObject(TestCase):
             DataObject.get_by_value(i, 'integer')
             for i in values
         ]
-        data_object_array = DataObjectArray.create_from_list(
+        array_data_object = ArrayDataObject.create_from_list(
             data_object_list, 'integer')
-        self.assertTrue(data_object_array.is_ready())
+        self.assertTrue(array_data_object.is_ready())
 
     def testTypeMismatchError(self):
         data_object_list = [
@@ -368,7 +369,7 @@ class TestArrayDataObject(TestCase):
             DataObject.get_by_value(False, 'boolean')
         ]
         with self.assertRaises(TypeMismatchError):
-            data_object_array = DataObjectArray.create_from_list(
+            array_data_object = ArrayDataObject.create_from_list(
                 data_object_list, 'integer')
 
     def testAddToArrayNonArrayError(self):
@@ -394,7 +395,7 @@ class TestArrayDataObject(TestCase):
             DataObject.get_by_value(3, 'integer'),
             DataObject.get_by_value(5, 'integer')
         ]
-        array1 = DataObjectArray.create_from_list(
+        array1 = ArrayDataObject.create_from_list(
             list1, 'integer')
 
         list2=[
@@ -402,5 +403,5 @@ class TestArrayDataObject(TestCase):
             array1
         ]
         with self.assertRaises(NestedArraysError):
-            array2 = DataObjectArray.create_from_list(
+            array2 = ArrayDataObject.create_from_list(
                 list2, 'integer')

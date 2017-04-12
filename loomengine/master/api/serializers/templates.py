@@ -1,12 +1,23 @@
 from rest_framework import serializers
-from django.db import transaction
 
 from .base import CreateWithParentModelSerializer, SuperclassModelSerializer
 from api.models.templates import *
 from api.models.input_output_nodes import InputOutputNode
-from api.models.signals import post_save_children
-from api import tasks
+from api import async
 from .input_output_nodes import InputOutputNodeSerializer
+
+
+DEFAULT_INPUT_GROUP = 0
+DEFAULT_INPUT_MODE = 'no_gather'
+DEFAULT_OUTPUT_MODE = 'no_scatter'
+
+
+def _set_input_defaults(input):
+    input.setdefault('group', DEFAULT_INPUT_GROUP)
+    input.setdefault('mode', DEFAULT_INPUT_MODE)
+
+def _set_output_defaults(output):
+    output.setdefault('mode', DEFAULT_OUTPUT_MODE)
 
 
 class FixedWorkflowInputSerializer(InputOutputNodeSerializer):
@@ -18,9 +29,16 @@ class FixedWorkflowInputSerializer(InputOutputNodeSerializer):
 
 class FixedStepInputSerializer(InputOutputNodeSerializer):
 
+    mode=serializers.CharField(required=False)
+    group=serializers.IntegerField(required=False)
+    
     class Meta:
         model = FixedStepInput
         fields = ('type', 'channel', 'data', 'mode', 'group')
+
+    def create(self, validated_data):
+        _set_input_defaults(validated_data)
+        return super(FixedStepInputSerializer, self).create(validated_data)
 
 
 class TemplateSerializer(SuperclassModelSerializer):
@@ -142,27 +160,19 @@ class StepSerializer(serializers.HyperlinkedModelSerializer):
         outputs = validated_data.get('outputs')
         if inputs:
             for input in inputs:
-                self._set_input_defaults(input)
+                _set_input_defaults(input)
         if outputs:
             for output in outputs:
-                self._set_output_defaults(output)
+                _set_output_defaults(output)
 
         # Type might not be explicitly declared
         validated_data['type'] = 'step'
 
-        with transaction.atomic():
-            step = super(StepSerializer, self).create(validated_data)
+        step = super(StepSerializer, self).create(validated_data)
 
-        tasks.postprocess_step(step.uuid)
+        async.postprocess_step(step.uuid)
 
         return step
-
-    def _set_input_defaults(self, input):
-        input.setdefault('group', DEFAULT_INPUT_GROUP)
-        input.setdefault('mode', DEFAULT_INPUT_MODE)
-
-    def _set_output_defaults(self, output):
-        output.setdefault('group', DEFAULT_OUTPUT_MODE)
 
     @classmethod
     def postprocess(cls, step_uuid):
@@ -189,7 +199,7 @@ class StepSerializer(serializers.HyperlinkedModelSerializer):
         # template finished postprocessing. If runs exist, postprocess them now.
         step = Step.objects.get(uuid=step.uuid)
         for step_run in step.runs.all():
-            tasks.postprocess_step_run(step_run.uuid)
+            async.postprocess_step_run(step_run.uuid)
 
 
 class TemplateLookupSerializer(serializers.Serializer):
@@ -258,10 +268,9 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         # Type may not be explicitly set
         validated_data['type'] = 'workflow'
 
-        with transaction.atomic():
-            workflow = super(WorkflowSerializer, self).create(validated_data)
+        workflow = super(WorkflowSerializer, self).create(validated_data)
 
-        tasks.postprocess_workflow(workflow.uuid)
+        async.postprocess_workflow(workflow.uuid)
 
         return workflow
 
@@ -297,7 +306,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
 
             workflow = Workflow.objects.get(uuid=workflow.uuid)
             for workflow_run in workflow.runs.all():
-                tasks.postprocess_workflow_run(workflow_run.uuid)
+                async.postprocess_workflow_run(workflow_run.uuid)
 
         except Exception as e:
             workflow.postprocessing_status = 'failed'

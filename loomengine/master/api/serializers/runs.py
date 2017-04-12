@@ -9,7 +9,6 @@ from api.serializers.templates import ExpandableTemplateSerializer
 from api.serializers.tasks import ExpandableTaskSerializer
 from api.serializers.input_output_nodes import InputOutputNodeSerializer
 from api.serializers.run_requests import RunRequestSerializer
-from api import tasks
 
 
 class RunSerializer(SuperclassModelSerializer):

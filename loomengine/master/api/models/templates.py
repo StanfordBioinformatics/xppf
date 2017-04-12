@@ -1,16 +1,16 @@
-from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
-from django.dispatch import receiver
 from django.core.exceptions import ValidationError
+from django.db import models
+from django.dispatch import receiver
 from django.utils import timezone
 import jsonfield
 
-from api.models import uuidstr
 from .base import BaseModel
 from .data_objects import DataObject
 from .input_output_nodes import InputOutputNode
-from .signals import post_save_children
 from api.exceptions import NoTemplateInputMatchError
+from api.models import uuidstr
+
 
 """
 This module defines Templates. A Template is either 
@@ -20,9 +20,27 @@ environment, while Workflows are collections of other Steps
 or Workflows.
 """
 
-DEFAULT_INPUT_GROUP = 0
-DEFAULT_INPUT_MODE = 'no_gather'
-DEFAULT_OUTPUT_MODE = 'no_scatter'
+def template_import_validator(value):
+    pass
+
+def workflow_outputs_validator(value):
+    pass
+
+def workflow_inputs_validator(value):
+    pass
+
+def step_environment_validator(value):
+    pass
+
+def step_outputs_validator(value):
+    pass
+
+def step_inputs_validator(value):
+    pass
+
+def step_resources_validator(value):
+    pass
+
 
 class WorkflowManager(object):
 
@@ -91,7 +109,8 @@ class Template(BaseModel):
                  ('complete', 'Complete'),
                  ('failed', 'Failed'))
     )
-    template_import = jsonfield.JSONField(null=True)
+    template_import = jsonfield.JSONField(validators=[template_import_validator],
+                                          null=True, blank=True)
 
     @classmethod
     def _get_manager_class(cls, type):
@@ -158,9 +177,11 @@ class Workflow(Template):
         through='WorkflowMembership',
         through_fields=('parent_template', 'child_template'),
         related_name='workflows')
-    outputs = jsonfield.JSONField(null=True)
-    inputs = jsonfield.JSONField(null=True)
-    raw_data = jsonfield.JSONField(null=True)
+    outputs = jsonfield.JSONField(validators=[workflow_outputs_validator],
+                                  null=True, blank=True)
+    inputs = jsonfield.JSONField(validators=[workflow_inputs_validator],
+                                 null=True, blank=True)
+    raw_data = jsonfield.JSONField(null=True, blank=True)
 
     def add_step(self, step):
         WorkflowMembership.add_step_to_workflow(step, self)
@@ -187,11 +208,15 @@ class Step(Template):
 
     command = models.TextField()
     interpreter = models.CharField(max_length=1024, default='/bin/bash -euo pipefail')
-    environment = jsonfield.JSONField(null=True)
-    outputs = jsonfield.JSONField(null=True)
-    inputs = jsonfield.JSONField(null=True)
-    resources = jsonfield.JSONField(null=True)
-    raw_data = jsonfield.JSONField(null=True)
+    environment = jsonfield.JSONField(validators=[step_environment_validator],
+                                      null=True, blank=True)
+    outputs = jsonfield.JSONField(validators=[step_outputs_validator],
+                                  null=True, blank=True)
+    inputs = jsonfield.JSONField(validators=[step_inputs_validator],
+                                 null=True, blank=True)
+    resources = jsonfield.JSONField(validators=[step_resources_validator],
+                                    null=True, blank=True)
+    raw_data = jsonfield.JSONField(null=True, blank=True)
 
 
 class FixedStepInput(InputOutputNode):
@@ -200,8 +225,8 @@ class FixedStepInput(InputOutputNode):
         'Step',
         related_name='fixed_inputs',
         on_delete=models.CASCADE)
-    mode = models.CharField(max_length=255, default=DEFAULT_INPUT_MODE)
-    group = models.IntegerField(default=DEFAULT_INPUT_GROUP)
+    mode = models.CharField(max_length=255)
+    group = models.IntegerField()
 
     class Meta:
         app_label = 'api'
@@ -212,17 +237,14 @@ class FixedStepInput(InputOutputNode):
         return
 
 
-class WorkflowMembership(models.Model):
+class WorkflowMembership(BaseModel):
 
     parent_template = models.ForeignKey('Workflow', related_name='children')
     child_template = models.ForeignKey('Template', related_name='parents', 
-                                       null=True)
+                                       null=True, blank=True)
 
     @classmethod
     def add_step_to_workflow(cls, step, parent):
             WorkflowMembership.objects.create(
                 parent_template=parent,
                 child_template=step)
-
-    class Meta:
-        app_label = 'api'

@@ -1,26 +1,17 @@
 from django.test import TransactionTestCase, override_settings
 
-from api import tasks
-from api.models import *
 from .test_templates import get_workflow
+from api.test.helper import make_run_request
+from api import async
+from api.models import *
 
-@override_settings(TEST_DISABLE_TASK_DELAY=True)
+
+@override_settings(TEST_DISABLE_ASYNC_DELAY=True, TEST_NO_PUSH_INPUTS_ON_RUN_CREATION=True)
 class TestRunRequest(TransactionTestCase):
 
-    def _get_run_request(self):
-        template = get_workflow()
-        run_request = RunRequest.objects.create(template=template)
-        input_one = RunRequestInput.objects.create(
-            run_request=run_request, channel='one')
-        data_object = StringDataObject.objects.create(
-            type='string', value='one')
-        input_one.add_data_as_scalar(data_object)
-        run_request.initialize_run()
-        tasks.postprocess_workflow_run(run_request.run.uuid)
-        return run_request
-
     def testInitialize(self):
-        run_request = self._get_run_request()
+        template = get_workflow()
+        run_request = make_run_request(template, one='one')
 
         # Verify that input data to run_request is shared with input
         # node for step

@@ -4,8 +4,30 @@
     state: directory
   when: storage_type == "local"
 
+- name: Create the logfile directory
+  file:
+    path: "{{server_settings_home}}/log"
+    state: directory
+
 - name: Verify Docker is running
   shell: "docker ps"
+
+- name: Create a config file for the Fluentd logging server
+  template:
+    src: templates/fluent.conf
+    dest: "{{server_settings_home}}/fluent.conf"
+
+- name: Start a Fluentd logging container
+  docker_container:
+    name: "{{fluentd_container_name}}"
+    hostname: "{{fluentd_container_name}}"
+    image: "{{fluentd_image}}"
+    restart_policy: always
+    api_version: auto
+    volumes:
+      - "{{server_settings_home}}/fluent.conf:/fluentd/etc/fluent.conf"
+      - "{{server_settings_home}}/log/:/fluentd/log/"
+    ports: "{{[ fluentd_port~':'~fluentd_port ]}}"
 
 - name: Start a MySQL database container
   docker_container:
@@ -19,6 +41,11 @@
       MYSQL_DATABASE: "{{mysql_database}}"
       MYSQL_USER: "{{mysql_user}}"
       MYSQL_PASSWORD: "{{mysql_password}}"
+    log_driver: fluentd
+    log_options:
+      fluentd-address: localhost:{{fluentd_port}}
+      fluentd-async-connect: "true"
+      tag: "loom.{%raw%}{{.Name}}.{{.ID}}{%endraw%}"
   when: mysql_create_docker_container
 
 - name: Start a rabbitmq container to handle message passing for asynchronous tasks
@@ -34,6 +61,11 @@
       RABBITMQ_HOST: "{{rabbitmq_host}}"
       RABBITMQ_PORT: "{{rabbitmq_port}}"
       RABBITMQ_VHOST: "{{rabbitmq_vhost}}"
+    log_driver: fluentd
+    log_options:
+      fluentd-address: localhost:{{fluentd_port}}
+      fluentd-async-connect: "true"
+      tag: "loom.{%raw%}{{.Name}}.{{.ID}}{%endraw%}"
 
 - name: Start a container with celery workers to run asynchronous tasks
   docker_container:
@@ -58,12 +90,45 @@
       | reject('undefined') | list}}"
     links: "{{[mysql_container_name if mysql_create_docker_container else none,\
             rabbitmq_container_name] | reject('none') | list}}"
+    log_driver: fluentd
+    log_options:
+      fluentd-address: localhost:{{fluentd_port}}
+      fluentd-async-connect: "true"
+      tag: "loom.{%raw%}{{.Name}}.{{.ID}}{%endraw%}"
 
 - name: Start a container with a celery scheduler to run scheduled tasks
   docker_container:
     name: "{{scheduler_container_name}}"
     image: "{{loom_docker_image}}"
     command: /loomengine/bin/run_scheduler.sh
+    restart_policy: always
+    api_version: auto
+    env_file: "{{server_settings_home}}/{{admin_settings_file}}"
+    env:
+      C_FORCE_ROOT: true
+      LOOM_SETTINGS_HOME: "{{container_settings_home}}"
+      LOOM_MYSQL_HOST: "{{mysql_host}}"
+      LOOM_RABBITMQ_HOST: "{{rabbitmq_container_name}}"
+      LOOM_MYSQL_SSL_CA_CERT_PATH: "{{container_mysql_ssl_ca_cert_path}}"
+      LOOM_MYSQL_SSL_CLIENT_CERT_PATH: "{{container_mysql_ssl_client_cert_path}}"
+      LOOM_MYSQL_SSL_CLIENT_KEY_PATH: "{{container_mysql_ssl_client_key_path}}"
+    volumes:
+      - "{{server_settings_home}}:{{container_settings_home}}"
+    links: "{{[mysql_container_name if mysql_create_docker_container else none,\
+            rabbitmq_container_name] | reject('none') | list}}"
+    log_driver: fluentd
+    log_options:
+      fluentd-address: localhost:{{fluentd_port}}
+      fluentd-async-connect: "true"
+      tag: "loom.{%raw%}{{.Name}}.{{.ID}}{%endraw%}"
+
+- name: Start a container running flower to monitor celery workers
+  when: debug
+  docker_container:
+    name: "{{flower_container_name}}"
+    hostname: "{{flower_container_name}}"
+    image: "{{loom_docker_image}}"
+    command: /loomengine/bin/run_flower.sh
     restart_policy: always
     api_version: auto
     env_file: "{{server_settings_home}}/{{admin_settings_file}}"
@@ -102,6 +167,11 @@
       - "{{server_settings_home}}:{{container_settings_home}}"
     links: "{{[mysql_container_name if mysql_create_docker_container else none,\
             rabbitmq_container_name] | reject('none') | list}}"
+    log_driver: fluentd
+    log_options:
+      fluentd-address: localhost:{{fluentd_port}}
+      fluentd-async-connect: "true"
+      tag: "loom.{%raw%}{{.Name}}.{{.ID}}{%endraw%}"
 
 - name: Create self-signed SSL certificate and key.
   command: openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout {{server_settings_home}}/{{admin_files_dir}}/{{ssl_cert_key_file}} -out {{server_settings_home}}/{{admin_files_dir}}/{{ssl_cert_file}} -subj "{{ssl_cert_subj}}"
@@ -110,7 +180,7 @@
 - name: Create a config file for the NGINX web server
   template:
     src: templates/nginx.conf
-    dest: "{{server_settings_home}}/{{nginx_conf_file}}"
+    dest: "{{server_settings_home}}/nginx.conf"
 
 - name: Start an NGINX server container
   docker_container:
@@ -119,13 +189,20 @@
     restart_policy: always
     api_version: auto
     volumes:
-      - "{{server_settings_home}}/{{nginx_conf_file}}:/etc/nginx/conf.d/default.conf"
+      - "{{server_settings_home}}/nginx.conf:/etc/nginx/conf.d/default.conf"
       - "{{server_settings_home}}/{{admin_files_dir}}/:{{container_settings_home}}/{{admin_files_dir}}"
     volumes_from:
       - "{{master_container_name}}"
-    links:
-      - "{{master_container_name}}"
+    links: "{{[master_container_name,\
+            flower_container_name if debug else none,\
+            rabbitmq_container_name if debug else none]\
+	    | reject('none') | list}}"
     ports: "{{[ http_port~':'~http_port if \
             (http_port_enabled or http_redirect_to_https) else none,\
-            https_port~':'~https_port if https_port_enabled else none]\
+            https_port~':'~https_port if https_port_enabled else none]
             | reject('none') | list}}"
+    log_driver: fluentd
+    log_options:
+      fluentd-address: localhost:{{fluentd_port}}
+      fluentd-async-connect: "true"
+      tag: "loom.{%raw%}{{.Name}}.{{.ID}}{%endraw%}"

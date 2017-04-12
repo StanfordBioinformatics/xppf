@@ -18,6 +18,11 @@
     name: "{{ scheduler_container_name }}"
     state: absent
 
+- name: Delete the container with flower
+  docker_container:
+    name: "{{ flower_container_name }}"
+    state: absent
+
 - name: Delete the container with the Loom Master webserver
   docker_container:
     name: "{{ master_container_name }}"
@@ -26,4 +31,9 @@
 - name: Delete the NGINX server container
   docker_container:
     name: "{{ nginx_container_name }}"
+    state: absent
+
+- name: Delete the Fluentd server container
+  docker_container:
+    name: "{{ fluentd_container_name }}"
     state: absent

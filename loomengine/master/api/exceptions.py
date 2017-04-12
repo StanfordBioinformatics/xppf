@@ -42,3 +42,6 @@ class NoTemplateInputMatchError(Exception):
 
 class ChannelNameCollisionError(Exception):
     pass
+
+class SaveRetriesExceededError(Exception):
+    pass

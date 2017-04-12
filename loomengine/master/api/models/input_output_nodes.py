@@ -1,8 +1,9 @@
-from .base import BaseModel
 from django.db import models
 
+from .base import BaseModel
 from api.models.data_objects import DataObject
-from api.models.data_trees import DataNode
+from api.models.data_trees import DataTreeNode
+
 
 """
 InputOutputNodes are connected to facilitate the flow of data in a workflow, e.g. from 
@@ -15,22 +16,26 @@ StepRunInput/Output) but not by TaskRuns, TaskRunAttempts, or TaskDefinitions si
 these only contain data as scalars or 1-dimensional arrays.
 """
 
+
 class ConnectError(Exception):
     pass
 
+
 class InputOutputNode(BaseModel):
     channel = models.CharField(max_length=255)
-    data_root = models.ForeignKey('DataNode',
-                                  null=True)
+    data_root = models.ForeignKey('DataTreeNode',
+                                  # related_name would cause conflicts on children
+                                  null=True,
+                                  blank=True)
 
     type = models.CharField(
         max_length=255,
-        choices=DataObject.TYPE_CHOICES)
+        choices=DataObject.DATA_TYPE_CHOICES)
 
     @property
     def data(self):
         # Dummy attribute required by serializers.
-        # DataNodeSerializer is needed to render this field.
+        # DataTreeNodeSerializer is needed to render this field.
         # We don't implement that as a model method here to avoid
         # circular dependencies between models and serializers.
         # To access data directly use the data_root field instead.
@@ -54,8 +59,9 @@ class InputOutputNode(BaseModel):
         return self.data_root.get_data_object(path)
 
     def _initialize_data_root(self):
-        self.data_root = DataNode.objects.create()
+        self.data_root = DataTreeNode.objects.create()
         self.data_root.root_node = self.data_root
+        self.data_root.save()
         self.save()
 
     def add_data_object(self, path, data_object):
@@ -103,48 +109,3 @@ class InputOutputNode(BaseModel):
     class Meta:
         abstract = True
         app_label = 'api'
-
-
-class InputNodeSet(object):
-    """Set of nodes acting as inputs for one step.
-    Each input node may have more than one DataObject,
-    and DataObjects may arrive to the node at different times.
-    An InputNodeSet corresponds to a single StepRun.
-    """
-    def __init__(self, input_nodes):
-        self.input_nodes = input_nodes
-
-    def get_ready_input_sets(self):
-        # This is simplified and only handles scalar inputs
-        for input_node in self.input_nodes:
-            if not input_node.is_ready():
-                return []
-        return [InputSet(self.input_nodes)]
-
-    def get_missing_inputs(self):
-        missing = []
-        for input_node in self.input_nodes:
-            if not input_node.is_ready():
-                missing.append(input_node)
-        return missing
-
-
-class InputItem(object):
-    """A DataObject and its channel name"""
-
-    def __init__(self, input_node):
-        self.data_object = input_node.get_data_as_scalar()
-        self.type = self.data_object.type
-        self.channel = input_node.channel
-
-
-class InputSet(object):
-    """An InputNodeSet can produce one or more InputSets, and each
-    InputSet corresponds to a single TaskRun.
-    """
-
-    def __init__(self, input_nodes):
-        self.input_items = [InputItem(i) for i in input_nodes]
-
-    def __iter__(self):
-        return self.input_items.__iter__()

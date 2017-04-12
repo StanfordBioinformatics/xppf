@@ -7,3 +7,8 @@
       api_version: auto
       network_mode: host
       command: /bin/bash -c 'loom-taskrunner --task_attempt_id {{task_attempt_id}} --master_url {{server_url}} --log_level {{log_level}} --log_file {{storage_root}}/loom_taskrunner-{{task_attempt_id}}.log}}'
+      log_driver: fluentd
+      log_options:
+        fluentd-address: "{{server_url | regex_replace('^.*://(.+):.*$', '\\1')}}:{{fluentd_port}}"
+        fluentd-async-connect: "true"
+        tag: "loom.{%raw%}{{.Name}}.{{.ID}}{%endraw%}"

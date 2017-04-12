@@ -1,23 +1,29 @@
-from django.db import models, IntegrityError
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned, ValidationError
+from django.db import models
 from django.dispatch import receiver
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.utils import timezone
 import jsonfield
 
 from .base import BaseModel
 from api import get_setting
+from api import async
 from api.exceptions import *
-from api.models.input_output_nodes import InputOutputNode, InputNodeSet
-from api.models.data_objects import DataObject
-from api.models.tasks import Task, TaskInput, TaskOutput
-from api.models.templates import Template
 from api.models import uuidstr
-from api import tasks
+from api.models.data_objects import DataObject
+from api.models.input_output_nodes import InputOutputNode
+from api.models.tasks import Task, TaskInput, TaskOutput, TaskAlreadyExistsException
+from api.models.templates import Template
+
 
 """
-This module defines WorkflowRun and other classes related to
+This module defines Run and other classes related to
 running an analysis
 """
+
+
+class RunAlreadyClaimedForPostprocessingException(Exception):
+    pass
+
 
 class WorkflowRunManager(object):
 
@@ -79,15 +85,17 @@ class Run(BaseModel):
                                        ('workflow', 'Workflow')))
     datetime_created = models.DateTimeField(default=timezone.now,
                                             editable=False)
-    datetime_finished = models.DateTimeField(null=True)
+    datetime_finished = models.DateTimeField(null=True, blank=True)
     parent = models.ForeignKey('WorkflowRun',
                                related_name='steps',
                                null=True,
+                               blank=True,
                                on_delete=models.CASCADE)
     template = models.ForeignKey('Template',
                                  related_name='runs',
                                  on_delete=models.PROTECT,
-                                 null=True) # For testing only
+                                 null=True, # For testing only
+                                 blank=True)
     postprocessing_status = models.CharField(
         max_length=255,
         default='not_started',
@@ -101,8 +109,6 @@ class Run(BaseModel):
     status_is_failed = models.BooleanField(default=False)
     status_is_killed = models.BooleanField(default=False)
     status_is_running = models.BooleanField(default=True)
-    # True if ANY input ports have not received all inputs
-    # status_waiting_for_inputs = models.BooleanField(default=False)
 
     @property
     def status(self):
@@ -116,7 +122,7 @@ class Run(BaseModel):
             return 'Finished'
         else:
             return 'Unknown'
-    
+
     @classmethod
     def _get_manager_class(cls, type):
         return cls._MANAGER_CLASSES[type]
@@ -127,7 +133,7 @@ class Run(BaseModel):
     @property
     def inputs(self):
         return self._get_manager().get_inputs()
-    
+
     @property
     def outputs(self):
         return self._get_manager().get_outputs()
@@ -171,8 +177,7 @@ class Run(BaseModel):
                 interpreter=template.step.interpreter,
                 parent=parent).run_ptr
             if run_request:
-                run_request.run = run
-                run_request.save()
+                run_request.setattrs_and_save_with_retries({'run': run})
 
             # Postprocess run only if postprocessing of template is done.
             # It is possible for the run to be completed before the template
@@ -181,7 +186,7 @@ class Run(BaseModel):
             # is ready
             template = Template.objects.get(uuid=template.uuid)
             if template.postprocessing_status == 'complete':
-                tasks.postprocess_step_run(run.uuid)
+                async.postprocess_step_run(run.uuid)
         else:
             assert template.type == 'workflow', \
                 'Invalid template type "%s"' % template.type
@@ -190,8 +195,7 @@ class Run(BaseModel):
                                              type=template.type,
                                              parent=parent).run_ptr
             if run_request:
-                run_request.run = run
-                run_request.save()
+                run_request.setattrs_and_save_with_retries({'run': run})
 
             # Postprocess run only if postprocessing of template is done.
             # It is possible for the run to be completed before the template
@@ -200,7 +204,7 @@ class Run(BaseModel):
             # is ready
             template = Template.objects.get(uuid=template.uuid)
             if template.postprocessing_status == 'complete':
-                tasks.postprocess_workflow_run(run.uuid)
+                async.postprocess_workflow_run(run.uuid)
 
         run.add_timepoint("Run %s@%s was created" % (run.name, run.uuid))
         if run.parent:
@@ -227,7 +231,8 @@ class Run(BaseModel):
     def _connect_input_to_parent(self, input):
         if self.parent:
             try:
-                parent_connector = self.parent.connectors.get(channel=input.channel)
+                parent_connector = self.parent.connectors.get(
+                    channel=input.channel)
                 parent_connector.connect(input)
             except ObjectDoesNotExist:
                 self.parent.downcast()._create_connector(input)
@@ -235,7 +240,6 @@ class Run(BaseModel):
                 raise ChannelNameCollisionError(
                     'ERROR! There is more than one run input named "%s". '\
                     'Channel names must be unique within a run.' % input.channel)
-            
 
     def _connect_input_to_run_request(self, input):
         try:
@@ -264,9 +268,9 @@ class Run(BaseModel):
                 self.parent.downcast()._create_connector(output)
 
     def fail(self, message, detail=''):
-        self.status_is_failed = True
-        self.status_is_running = False
-        self.save()
+        self.setattrs_and_save_with_retries({
+            'status_is_failed': True,
+            'status_is_running': False})
         self.add_timepoint(message, detail=detail, is_error=True)
         if self.parent:
             self.parent.fail('Run %s failed' % self.uuid, detail=detail)
@@ -279,7 +283,43 @@ class Run(BaseModel):
     def add_timepoint(self, message, detail='', is_error=False):
         timepoint = RunTimepoint.objects.create(
             message=message, run=self, detail=detail, is_error=is_error)
-        timepoint.save()
+
+    def _claim_for_postprocessing(self):
+        # There are two paths to get Run.postprocess():
+        # 1. user calls "run" on a template that is already ready, and
+        #    run is postprocessed right away.
+        # 2. user calls "run" on a template that is not ready, and run
+        #    is postprocessed only after template is ready.
+        # There is a chance of both paths being executed, so we have to
+        # protect against that
+
+        assert self.template.postprocessing_status == 'complete', \
+            'Template not ready, cannot postprocess run %s' % run.uuid
+
+        self.postprocessing_status = 'in_progress'
+        try:
+            self.save()
+        except ConcurrentModificationError:
+            # The "save" method is overridden in our base model to have concurrency
+            # protection. This error implies that the run was modified since
+            # it was loaded.
+            # Let's make sure it's being postprocessed by another
+            # process, and we will defer to that process.
+            run = Run.objects.get(uuid=run_uuid)
+            if run.postprocessing_status != 'not_started':
+                # Good, looks like another worker is postprocessing this run,
+                # so we're done here
+                raise RunAlreadyClaimedForPostprocessingException
+            else:
+                # Don't know why this run was modified. Raise an error
+                raise Exception('Postprocessing failed due to unexpected '\
+                                'concurrent modification')
+
+    def _push_all_inputs(self):
+        if get_setting('TEST_NO_PUSH_INPUTS_ON_RUN_CREATION'):
+            return
+        for input in self.inputs.all():
+            input.push_all()
 
 
 class RunTimepoint(BaseModel):
@@ -292,57 +332,32 @@ class RunTimepoint(BaseModel):
     message = models.CharField(max_length=255)
     detail = models.TextField(null=True, blank=True)
     is_error = models.BooleanField(default=False)
-    
+
 
 class WorkflowRun(Run):
 
-    # True if ANY steps are running
-    # status_running = models.BooleanField(default=False)
-
-    # status_steps_waiting = models.IntegerField(default=0)
-    # status_steps_running = models.IntegerField(default=0)
-    # status_steps_finished = models.IntegerField(default=0)
-
     def add_step(self, step_run):
-        step_run.parent = self
-        step_run.save()
+        step_run.setattrs_and_save_with_retries({'parent': self})
 
     @classmethod
     def postprocess(cls, run_uuid):
-        # There are two paths to get here:
-        # 1. user calls "run" on a template that is already ready, and
-        #    run is postprocessed right away.
-        # 2. user calls "run" on a template that is not ready, and run
-        #    is postprocessed only after template is ready.
-
         run = WorkflowRun.objects.get(uuid=run_uuid)
 
-        assert run.template.postprocessing_status == 'complete', \
-            'Template not ready, cannot postprocess run %s' % run.uuid
-
-        # Don't postprocess twice
-        # The "save" method is overridden in our base model to have concurrency
-        # protection
-
-        if not run.postprocessing_status == 'not_started':
-            return
-        run.postprocessing_status = 'in_progress'
         try:
-            run.save()
-        except ConcurrentModificationError:
+            run._claim_for_postprocessing()
+        except RunAlreadyClaimedForPostprocessingException:
             return
 
         try:
             run._initialize_inputs()
             run._initialize_outputs()
             run._initialize_steps()
-
-            run.postprocessing_status = 'complete'
-            run.save()
+            run.setattrs_and_save_with_retries({'postprocessing_status': 'complete'})
         except Exception as e:
-            run.postprocessing_status = 'failed'
-            run.save()
-            raise e
+            run = WorkflowRun.objects.get(uuid=run_uuid)
+            run.setattrs_and_save_with_retries({'postprocessing_status': 'failed'})
+            run.fail('Postprocessing failed', detail=e.message)
+            raise
 
     def _initialize_inputs(self):
         run = self.downcast()
@@ -357,7 +372,8 @@ class WorkflowRun(Run):
                 run_input = WorkflowRunInput.objects.create(
                     workflow_run=run,
                     channel=input.get('channel'),
-                    type=input.get('type'))
+                    type=input.get('type'),
+                )
 
                 # One of these two should always take effect. The other is ignored.
                 self._connect_input_to_parent(run_input)
@@ -419,16 +435,15 @@ class WorkflowRun(Run):
                 channel = io_node.channel,
                 type = io_node.type
             )
-        except IntegrityError:
+        except ValidationError:
             # connector already exists. Just use it.
             connector = self.connectors.get(channel=io_node.channel)
         connector.connect(io_node)
 
     def update_workflow_status(self):
         if self._are_children_finished():
-            self.status_is_running = False
-            self.status_is_finished = True
-            self.save()
+            self.setattrs_and_save_with_retries({'status_is_running': False,
+                                                 'status_is_finished': True})
             self.add_timepoint("Run %s@%s finished successfully" % (
                 self.name, self.uuid))
             if self.parent:
@@ -442,9 +457,9 @@ class WorkflowRun(Run):
 
     def _kill(self, kill_message):
         self.add_timepoint('Run killed', detail=kill_message, is_error=True)
-        self.status_is_killed = True
-        self.status_is_running = False
-        self.save()
+        self.setattrs_and_save_with_retries(
+            {'status_is_killed': True,
+             'status_is_running': False})
         for step in self.downcast().steps.all():
             step.kill(kill_message)
 
@@ -454,60 +469,25 @@ class StepRun(Run):
     command = models.TextField()
     interpreter = models.CharField(max_length=1024)
 
-    # True if ANY tasks are running
-    # status_running = models.BooleanField(default=False)
-
-    # status_tasks_running = models.IntegerField(default=0)
-    # status_tasks_finished = models.IntegerField(default=0)
-    # status_tasks_failed = models.IntegerField(default=0)
-
-    def create_ready_tasks(self, do_start=True):
-        # This is a temporary limit. It assumes no parallel workflows, and no
-        # failure recovery, so each step has only one Task.
-        if self.tasks.count() > 0:
-            # Already ran. Nothing new to process
-            return []
-        else:
-            for input_set in InputNodeSet(
-                    self.inputs.all()).get_ready_input_sets():
-                task = Task.create_from_input_set(input_set, self)
-            return self.tasks.all()
-
     @classmethod
     def postprocess(cls, run_uuid):
-        # There are two paths to get here:
-        # 1. user calls "run" on a template that is already ready, and
-        #    run is postprocessed right away.
-        # 2. user calls "run" on a template that is not ready, and run
-        #    is postprocessed only after template is ready.
-
         run = StepRun.objects.get(uuid=run_uuid)
 
-        assert run.template.postprocessing_status == 'complete', \
-            'Template not ready, cannot postprocess run %s' % run.uuid
-
-        # Don't postprocess twice
-        # The "save" method is overridden in our base model to have concurrency
-        # protection
-
-        if not run.postprocessing_status == 'not_started':
-            return
-        run.postprocessing_status = 'in_progress'
         try:
-            run.save()
-        except ConcurrentModificationError:
-            # Already being processed. Nothing to do.
+            run._claim_for_postprocessing()
+        except RunAlreadyClaimedForPostprocessing:
             return
 
         try:
             run._initialize_inputs()
             run._initialize_outputs()
-            run.postprocessing_status = 'complete'
-            run.save()
+            run.setattrs_and_save_with_retries({'postprocessing_status': 'complete'})
+            run._push_all_inputs()
         except Exception as e:
-            run.postprocessing_status = 'failed'
-            run.save()
-            raise e
+            run = StepRun.objects.get(uuid=run_uuid)
+            run.setattrs_and_save_with_retries({'postprocessing_status': 'failed'})
+            run.fail('Postprocessing failed', detail=e.message)
+            raise
 
     def _initialize_inputs(self):
         visited_channels = set()
@@ -555,44 +535,47 @@ class StepRun(Run):
                 step_run=self,
                 type=output.get('type'),
                 channel=output.get('channel'),
-                source=output.get('source'))
-                
+                source=output.get('source'),
+                mode=output.get('mode'))
+
             self._connect_output_to_parent(run_output)
 
     def get_output(self, channel):
         return self.outputs.get(channel=channel)
 
     def update_status(self):
-        self.status_is_finished = True
-        self.status_is_running = False
-        self.save()
+        self.setattrs_and_save_with_retries({'status_is_running': False,
+                                             'status_is_finished': True})
         self.add_timepoint("Run %s@%s finished successfully" % (self.name, self.uuid))
         if self.parent:
             self.parent.add_timepoint(
                 "Child Run %s@%s finished successfully" % (self.name, self.uuid))
             self.parent.update_workflow_status()
-                
 
     def _kill(self, kill_message):
         self.add_timepoint('Run killed', detail=kill_message, is_error=True)
-        self.status_is_killed = True
-        self.status_is_running = False
-        self.save()
+        self.setattrs_and_save_with_retries(
+            {'status_is_killed': True,
+             'status_is_running': False})
         for task in self.downcast().tasks.all():
             task.kill(kill_message)
+            
+    def push(self, channel, index):
+        """Indicates that new data is available at the given index 
+        on the given channel. This may trigger creation of new tasks.
+        """
+        for input_set in TaskInputManager(
+                self.inputs.all(), channel, index).get_ready_input_sets():
+            if get_setting('TEST_NO_TASK_CREATION'):
+                return
+            try:
+                task = Task.create_from_input_set(input_set, self)
+                async.run_task(task.uuid)
+            except TaskAlreadyExistsException:
+                pass
 
 
-class AbstractStepRunInput(InputOutputNode):
-
-    def is_ready(self):
-        if self.get_data_as_scalar() is None:
-            return False
-        return self.get_data_as_scalar().is_ready()
-
-    class Meta:
-        abstract=True
-
-class StepRunInput(AbstractStepRunInput):
+class StepRunInput(InputOutputNode):
 
     step_run = models.ForeignKey('StepRun',
                                  related_name='inputs',
@@ -600,15 +583,40 @@ class StepRunInput(AbstractStepRunInput):
     mode = models.CharField(max_length=255)
     group = models.IntegerField()
 
+    def is_ready(self):
+        if self.get_data_as_scalar() is None:
+            return False
+        return self.get_data_as_scalar().is_ready()
+
+    def push_all(self):
+        """Notify steps that input data is available.
+        This method triggers a separate call to push(index) on the StepRunInput
+        for each available DataObject.
+        """
+        if self.data_root is None:
+            return
+	self.data_root.push_all()
+
+    def push(self, index):
+        """Indicates that new data is available at the given index.
+        Notify StepRun.
+        """
+        self.step_run.push(self.channel, index)
+
 
 class StepRunOutput(InputOutputNode):
 
     step_run = models.ForeignKey('StepRun',
                                  related_name='outputs',
                                  on_delete=models.CASCADE,
-                                 null=True) # for testing only
+                                 null=True, # for testing only
+                                 blank=True)
     mode = models.CharField(max_length=255)
-    source = jsonfield.JSONField(null=True)
+    source = jsonfield.JSONField(null=True, blank=True)
+
+    def push(self, index, data_object):
+        self.add_data_object(index, data_object)
+        self.data_root.push_by_index(index)
 
 
 class WorkflowRunConnectorNode(InputOutputNode):
@@ -627,6 +635,7 @@ class WorkflowRunConnectorNode(InputOutputNode):
     class Meta:
         unique_together = (("workflow_run", "channel"),)
 
+
 class WorkflowRunInput(InputOutputNode):
 
     workflow_run = models.ForeignKey('WorkflowRun',
@@ -640,3 +649,45 @@ class WorkflowRunOutput(InputOutputNode):
                                      related_name='outputs',
                                      on_delete=models.CASCADE)
 
+
+class TaskInputManager(object):
+    """Manages the set of nodes acting as inputs for one step.
+    Each input node may have more than one DataObject,
+    and DataObjects may arrive to the node at different times.
+    """
+    def __init__(self, input_nodes, channel, index):
+        self.input_nodes = input_nodes
+        self.channel = channel
+        self.index = index
+
+    def get_ready_input_sets(self):
+        """New data is available at the given channel and index. See whether 
+        any new tasks can be created with this data.
+        """
+        for input_node in self.input_nodes:
+            if not input_node.is_ready():
+                return []
+        return [InputSet(self.input_nodes, self.index)]
+
+
+class InputItem(object):
+    """Info needed by the Task to construct a TaskInput
+    """
+
+    def __init__(self, input_node, index):
+        self.data_object = input_node.get_data_object(index)
+        self.type = self.data_object.type
+        self.channel = input_node.channel
+
+
+class InputSet(object):
+    """A TaskInputManager can produce one or more InputSets, where each
+    InputSet corresponds to a single Task.
+    """
+
+    def __init__(self, input_nodes, index):
+        self.index = index
+        self.input_items = [InputItem(i, index) for i in input_nodes]
+
+    def __iter__(self):
+        return self.input_items.__iter__()

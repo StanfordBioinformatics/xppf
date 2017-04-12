@@ -6,6 +6,7 @@ from .base import BaseModel
 from .input_output_nodes import InputOutputNode
 from .runs import Run
 
+
 class RunRequest(BaseModel):
 
     """RunRequest contains information submitted by a user
@@ -18,6 +19,7 @@ class RunRequest(BaseModel):
     template = models.ForeignKey('Template', on_delete=models.PROTECT)
     run = models.OneToOneField('Run',
                                null=True,
+                               blank=True,
                                related_name='run_request',
                                on_delete=models.PROTECT)
 

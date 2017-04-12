@@ -4,11 +4,13 @@
   - name: Resolve release version URL, which could be a link, to a Fedora Project EPEL mirror.
     uri: url=http://download.fedoraproject.org/pub/epel/{{release_version.stdout}}
     register: resolved_mirror
+    retries: 10
   - name: Add epel repository to yum.
     yum_repository:
       name: epel
       description: EPEL YUM repo
       baseurl: "{{resolved_mirror.url}}$basearch/"
+    retries: 10
   - name: Install pip, which is needed to install docker-py.
     yum: name=python-pip disable_gpg_check=yes update_cache=yes
     register: pipinstallresult

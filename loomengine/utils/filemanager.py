@@ -492,7 +492,7 @@ class FileManager:
                     'Use "--force-duplicates" if you want to create another copy.'
                     % (md5, '", "'.join(matches)))
         
-        return self.connection.post_data_object({
+        file_data_object = self.connection.post_data_object({
             'type': 'file',
             'filename': filename,
             'md5': md5,
@@ -501,6 +501,7 @@ class FileManager:
                 'note': note },
             'source_type': 'imported',
         })
+        return file_data_object
 
     def import_result_file(self, task_attempt_output, source_url):
         self.logger.info('Calculating md5 on file "%s"...' % source_url)
@@ -523,8 +524,7 @@ class FileManager:
                     'source_type': 'result',
                     'md5': md5,
                 }})
-        return self.connection.get_data_object(
-            updated_task_attempt_output['data_object']['uuid'])
+        return updated_task_attempt_output.get('data_object')
 
     def import_log_file(self, task_attempt, source_url):
         log_name = os.path.basename(source_url)
@@ -535,17 +535,16 @@ class FileManager:
         source = Source(source_url, self.settings)
         md5 = source.calculate_md5()
 
-        file_data_object = self.connection.get_data_object(log_file['file']['uuid'])
+        file_data_object = self.\
+                           connection.task_attempt_log_file_initialize_file_data_object(
+                               log_file['uuid'])
 
         assert not file_data_object.get('md5')
         file_data_object.update({'md5': md5,
                                  'filename': log_name})
-        file_data_object['file_resource'].update({'md5': md5})
-        
         # update file_data_object with md5 and other missing info
         file_data_object = self.connection.update_data_object(
-            log_file['file']['uuid'], file_data_object)
-        
+            file_data_object['uuid'], file_data_object)
         return self._execute_file_import(
             file_data_object,
             source_url
@@ -558,7 +557,9 @@ class FileManager:
         # identical content, the data_object.file_resource may have
         # status=complete, indicating that no re-upload is needed.
         #
-        assert file_data_object.get('file_resource') is not None
+        file_data_object['file_resource'] = self.connection.\
+                                            file_data_object_initialize_file_resource(
+                                                file_data_object['uuid'])
 
         source = Source(source_url, self.settings)
         self.logger.info('Importing file from %s...' % source.get_url())
@@ -567,7 +568,7 @@ class FileManager:
             self.logger.info(
                 '   server already has the file. Skipping upload.')
             return file_data_object
-        
+
         try:
             destination = Destination(
                 file_data_object['file_resource']['file_url'],

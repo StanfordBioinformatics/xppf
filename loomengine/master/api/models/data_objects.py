@@ -1,6 +1,5 @@
 from django.db import models
 from django.utils import timezone
-from django.dispatch import receiver
 import jsonfield
 import os
 
@@ -8,6 +7,7 @@ from .base import BaseModel
 from api import get_setting
 from api.models import uuidstr
 from api.exceptions import NoFileMatchError, MultipleFileMatchesError
+
 
 class TypeMismatchError(Exception):
     pass
@@ -25,13 +25,13 @@ class InvalidSourceTypeError(Exception):
     pass
 
 
-class DataObjectManager():
-    
+class AbstractDataObjectManager():
+
     def __init__(self, model):
         self.model = model
 
 
-class BooleanDataObjectManager(DataObjectManager):
+class BooleanDataObjectManager(AbstractDataObjectManager):
 
     @classmethod
     def get_by_value(cls, value):
@@ -43,7 +43,8 @@ class BooleanDataObjectManager(DataObjectManager):
     def is_ready(self):
         return True
 
-class FileDataObjectManager(DataObjectManager):
+
+class FileDataObjectManager(AbstractDataObjectManager):
 
     @classmethod
     def get_by_value(cls, value):
@@ -68,7 +69,8 @@ class FileDataObjectManager(DataObjectManager):
         resource = self.model.filedataobject.file_resource
         return resource is not None and resource.is_ready()
 
-class FloatDataObjectManager(DataObjectManager):
+
+class FloatDataObjectManager(AbstractDataObjectManager):
 
     @classmethod
     def get_by_value(cls, value):
@@ -81,7 +83,7 @@ class FloatDataObjectManager(DataObjectManager):
         return True
 
 
-class IntegerDataObjectManager(DataObjectManager):
+class IntegerDataObjectManager(AbstractDataObjectManager):
 
     @classmethod
     def get_by_value(cls, value):
@@ -94,7 +96,7 @@ class IntegerDataObjectManager(DataObjectManager):
         return True
 
 
-class StringDataObjectManager(DataObjectManager):
+class StringDataObjectManager(AbstractDataObjectManager):
 
     @classmethod
     def get_by_value(cls, value):
@@ -107,7 +109,7 @@ class StringDataObjectManager(DataObjectManager):
         return True
 
 
-class DataObjectArrayManager(DataObjectManager):
+class ArrayDataObjectManager(AbstractDataObjectManager):
 
     def get_substitution_value(self):
         return [member.substitution_value
@@ -128,9 +130,9 @@ class DataObject(BaseModel):
         'string': StringDataObjectManager,
     }
 
-    _ARRAY_MANAGER_CLASS = DataObjectArrayManager
+    _ARRAY_MANAGER_CLASS = ArrayDataObjectManager
 
-    TYPE_CHOICES = (
+    DATA_TYPE_CHOICES = (
         ('boolean', 'Boolean'),
         ('file', 'File'),
         ('float', 'Float'),
@@ -138,15 +140,15 @@ class DataObject(BaseModel):
         ('string', 'String'),
     )
 
-    uuid = models.CharField(default=uuidstr, editable=False,
+    uuid = models.CharField(default=uuidstr,
                             unique=True, max_length=255)
     type = models.CharField(
         max_length=255,
-        choices=TYPE_CHOICES)
+        choices=DATA_TYPE_CHOICES)
     is_array = models.BooleanField(
         default=False)
     datetime_created = models.DateTimeField(
-        default=timezone.now, editable=False)
+        default=timezone.now)
 
     @classmethod
     def _get_manager_class(cls, type):
@@ -170,40 +172,41 @@ class DataObject(BaseModel):
         if not array.is_array:
             raise NonArrayError('Cannot add members when is_array=False')
         if self.is_array:
-            raise NestedArraysError('Cannot nest DataObjectArrays')
+            raise NestedArraysError('Cannot nest ArrayDataObjects')
         ArrayMembership.objects.create(
             array=array, member=self, order=array.prefetch_members.count())
 
     def is_ready(self):
         return self._get_manager().is_ready()
 
+
 class BooleanDataObject(DataObject):
 
-    value = models.BooleanField()
+    value = models.BooleanField(null=False)
 
 
 class FileDataObject(DataObject):
 
     NAME_FIELD = 'filename'
     HASH_FIELD = 'md5'
-    
+
+    FILE_SOURCE_TYPE_CHOICES = (('imported', 'Imported'),
+                                ('result', 'Result'),
+                                ('log', 'Log'))
+
     filename = models.CharField(max_length=1024)
-    file_resource = models.ForeignKey('FileResource', null=True,
-                                      related_name='file_data_objects')
-    md5 = models.CharField(max_length=255)
+    file_resource = models.ForeignKey('FileResource',
+                                      null=True,
+                                      related_name='file_data_objects',
+                                      on_delete=models.PROTECT,
+                                      blank=True)
+    md5 = models.CharField(max_length=255, null=True, blank=True)
     source_type = models.CharField(
         max_length=255,
-        choices=(('imported', 'Imported'),
-                 ('result', 'Result'),
-                 ('log', 'Log'))
-    )
-    file_import = jsonfield.JSONField(null=True)
+        choices=FILE_SOURCE_TYPE_CHOICES)
+    file_import = jsonfield.JSONField(null=True, blank=True)
 
-    def initialize(self):
-        if not self.file_resource:
-            self._initialize_file_resource()
-
-    def _initialize_file_resource(self):
+    def initialize_file_resource(self):
         # Based on settings, choose the path where the
         # file should be stored and create a FileResource
         # with upload_status=incomplete.
@@ -216,14 +219,15 @@ class FileDataObject(DataObject):
                 upload_status='complete')
             if matching_file_resources.count() > 0:
                 # First match is as good as any
-                self.file_resource = matching_file_resources.first()
-                self.save()
+                file_resource = matching_file_resources.first()
+                self.setattrs_and_save_with_retries({
+                    'file_resource': file_resource})
                 return self.file_resource
         # No existing file to use. Create a new resource for upload.
-        self.file_resource  = FileResource\
-            .create_incomplete_resource_for_import(self)
-        self.save()
-
+        file_resource  = FileResource\
+                         .create_incomplete_resource_for_import(self)
+        self.setattrs_and_save_with_retries({
+            'file_resource': file_resource})
         return self.file_resource
 
 
@@ -242,7 +246,7 @@ class StringDataObject(DataObject):
     value = models.TextField(max_length=10000)
 
 
-class DataObjectArray(DataObject):
+class ArrayDataObject(DataObject):
 
     @property
     def members(self):
@@ -261,7 +265,7 @@ class DataObjectArray(DataObject):
     @classmethod
     def create_from_list(cls, data_object_list, type):
         cls._validate_list(data_object_list, type)
-        array = DataObjectArray.objects.create(is_array=True, type=type)
+        array = ArrayDataObject.objects.create(is_array=True, type=type)
         for data_object in data_object_list:
             data_object.add_to_array(array)
         return array
@@ -274,14 +278,18 @@ class DataObjectArray(DataObject):
                     'Expected type "%s", but DataObject %s is type %s' \
                     % (type, data_object.uuid, data_object.type))
             if data_object.is_array:
-                raise NestedArraysError('Cannot nest DataObjectArrays')
+                raise NestedArraysError('Cannot nest ArrayDataObjects')
 
 
 class ArrayMembership(BaseModel):
 
     # ManyToMany relationship between arrays and their items
-    array = models.ForeignKey('DataObjectArray', related_name='has_array_members_membership')
-    member = models.ForeignKey('DataObject', related_name='in_array_membership')
+    array = models.ForeignKey('ArrayDataObject',
+                              related_name='has_array_members_membership',
+                              on_delete=models.CASCADE)
+    member = models.ForeignKey('DataObject',
+                               related_name='in_array_membership',
+                               on_delete=models.CASCADE)
     order = models.IntegerField()
 
     class Meta:
@@ -290,18 +298,21 @@ class ArrayMembership(BaseModel):
 
 class FileResource(BaseModel):
 
-    uuid = models.CharField(default=uuidstr, editable=False,
+    FILE_RESOURCE_UPLOAD_STATUS_CHOICES = (('incomplete', 'Incomplete'),
+                                           ('complete', 'Complete'),
+                                           ('failed', 'Failed'))
+    FILE_RESOURCE_UPLOAD_STATUS_DEFAULT = 'incomplete'
+    
+    uuid = models.CharField(default=uuidstr,
                             unique=True, max_length=255)
     datetime_created = models.DateTimeField(
-        default=timezone.now, editable=False)
+        default=timezone.now)
     file_url = models.CharField(max_length=1000)
-    md5 = models.CharField(max_length=255)
+    md5 = models.CharField(max_length=255, null=True, blank=True)
     upload_status = models.CharField(
         max_length=255,
-        default='incomplete',
-        choices=(('incomplete', 'Incomplete'),
-                 ('complete', 'Complete'),
-                 ('failed', 'Failed')))
+        default=FILE_RESOURCE_UPLOAD_STATUS_DEFAULT,
+        choices=FILE_RESOURCE_UPLOAD_STATUS_CHOICES)
 
     def is_ready(self):
         return self.upload_status == 'complete'

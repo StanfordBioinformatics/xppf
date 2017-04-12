@@ -2,7 +2,6 @@ from django.test import TestCase
 from rest_framework import serializers
 
 from api.serializers.tasks import *
-from api.serializers.data_trees import DataNodeSerializer
 from api.models.tasks import *
 from api.models.data_objects import BooleanDataObject, StringDataObject, \
     FileResource, FileDataObject
@@ -16,6 +15,7 @@ def get_task():
         rendered_command='echo True',
         resources={'memory': '1', 'disk_size': '1', 'cores': '1'},
         environment={'docker_image': 'ubuntu'},
+        index=[0],
     )
     input_data_object = BooleanDataObject.objects.create(
         type='boolean',
@@ -38,10 +38,17 @@ def get_task():
         data_object=output_data_object,
         source={'stream': 'stdout'}
     )
-    task_attempt = TaskAttempt.objects.create(task=task)
+    task_attempt = TaskAttempt.objects.create(
+        task=task,
+        interpreter = task.interpreter,
+        rendered_command=task.rendered_command,
+        environment=task.environment,
+        resources=task.resources)
     task_attempt_output = TaskAttemptOutput.objects.create(
         task_attempt=task_attempt,
-        data_object=output_data_object
+        data_object=output_data_object,
+        type='file',
+        channel='test'
     )
     task_attempt_timepoint = TaskAttemptTimepoint.objects.create(
         task_attempt=task_attempt,

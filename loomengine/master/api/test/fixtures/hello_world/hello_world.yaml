@@ -1,0 +1,68 @@
+---
+name: hello_world
+inputs:
+- type: file
+  hint: Enter the 'hello' file
+  channel: hello
+- type: file
+  hint: Enter the 'world' file
+  channel: world
+fixed_inputs:
+- type: string
+  channel: final_punc
+  data:
+    contents: "!!"
+outputs:
+- type: string
+  channel: hello_world
+steps:
+- name: hello_step
+  command: cat {{ hello }} | tr '[a-z]' '[A-Z]' > {{ hello_cap }}
+  environment:
+    docker_image: ubuntu
+  resources:
+    cores: '1'
+    memory: '1'
+  inputs:
+  - type: file
+    channel: hello
+  outputs:
+  - type: file
+    channel: hello_cap
+    source:
+      filename: hello_cap.txt
+- name: world_step
+  command: cat {{ world }} | tr '[a-z]' '[A-Z]' > {{ world_cap }}
+  environment:
+    docker_image: ubuntu
+  resources:
+    cores: '1'
+    memory: '1'
+  inputs:
+  - type: file
+    channel: world
+  outputs:
+  - type: file
+    channel: world_cap
+    source:
+      filename: world_cap.txt
+- name: hello_world_step
+  command: echo $(cat {{ hello_cap }} {{ world_cap }})'{{ final_punc}}' > {{ hello_world
+    }}
+  environment:
+    docker_image: ubuntu
+  resources:
+    cores: '1'
+    memory: '1'
+  inputs:
+  - type: file
+    channel: hello_cap
+  - type: file
+    channel: world_cap
+  - type: string
+    channel: final_punc
+  outputs:
+  - type: string
+    channel: hello_world
+    source:
+      filename: hello_world.out

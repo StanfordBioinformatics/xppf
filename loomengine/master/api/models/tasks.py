@@ -1,17 +1,28 @@
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
-from django.dispatch import receiver
-from django.core.exceptions import ObjectDoesNotExist
-from django.dispatch import receiver
 from django.utils import timezone
-import os
 import jsonfield
+import os
 
-from api import tasks
-from api.models import uuidstr
 from .base import BaseModel, render_from_template
-from api.models.data_objects import DataObject, FileDataObject
 from api import get_setting
+from api import async
+from api.models import uuidstr
+from api.models.data_objects import DataObject, FileDataObject
 
+
+class TaskAlreadyExistsException(Exception):
+    pass
+
+
+def validate_list_of_ints(value):
+    try:
+        are_ints = [isinstance(i, int) for i in value]
+    except TypeError:
+        raise ValidationError('Value must be a list of ints')
+    if not all(are_ints):
+        raise ValidationError('Value must be a list of ints')
+    
 
 class Task(BaseModel):
 
@@ -24,22 +35,26 @@ class Task(BaseModel):
                             unique=True, max_length=255)
     datetime_created = models.DateTimeField(default=timezone.now,
                                             editable=False)
-    datetime_finished = models.DateTimeField(null=True)
+    datetime_finished = models.DateTimeField(null=True, blank=True)
     interpreter = models.CharField(max_length=1024)
     command = models.TextField()
-    rendered_command = models.TextField()
+    rendered_command = models.TextField(null=True, blank=True)
     environment = jsonfield.JSONField()
     resources = jsonfield.JSONField()
     
     step_run = models.ForeignKey('StepRun',
                                  related_name='tasks',
                                  on_delete=models.CASCADE,
-                                 null=True) # null for testing only
+                                 null=True, # null for testing only
+                                 blank=True)
 
     selected_task_attempt = models.OneToOneField('TaskAttempt',
-                                               related_name='task_as_selected',
-                                               on_delete=models.CASCADE,
-                                               null=True)
+                                                 related_name='task_as_selected',
+                                                 on_delete=models.CASCADE,
+                                                 null=True,
+                                                 blank=True)
+    index = jsonfield.JSONField(validators=[validate_list_of_ints],
+                                null=True, blank=True)
 
     # While status_is_running, Loom will continue trying to complete the task
     status_is_running = models.BooleanField(default=True)
@@ -65,9 +80,9 @@ class Task(BaseModel):
         return (timezone.now() - last_heartbeat).total_seconds() > timeout
 
     def fail(self, message, detail=''):
-        self.status_is_failed = True
-        self.status_is_running = False
-        self.save()
+        self.setattrs_and_save_with_retries(
+            {'status_is_failed': True,
+             'status_is_running': False})
         self.add_timepoint(message, detail=detail, is_error=True)
         if not self.step_run.status_is_failed:
             self.step_run.fail(
@@ -75,63 +90,39 @@ class Task(BaseModel):
                 detail=detail)
     
     def finish(self):
-        self.set_datetime_finished()
-        self.status_is_finished = True
-        self.status_is_running = False
-        self.save()
+        self.setattrs_and_save_with_retries(
+            { 'datetime_finished': timezone.now(),
+              'status_is_finished': True,
+              'status_is_running': False })
         self.step_run.add_timepoint('Child Task %s finished successfully' % self.uuid)
         self.step_run.update_status()
         for output in self.outputs.all():
             output.pull_data_object()
-            output.push_data_object()
+            output.push_data_object(self.index)
         for task_attempt in self.task_attempts.all():
             task_attempt.cleanup()
 
     def kill(self, kill_message):
-        self.status_is_running = False
-        self.status_is_killed = True
-        self.save()
+        self.setattrs_and_save_with_retries({
+            'status_is_running': False,
+            'status_is_killed': True
+        })
         self.add_timepoint('Task killed', detail=kill_message, is_error=True)
         for task_attempt in self.task_attempts.all():
-            task_attempt.kill(kill_message)
-            task_attempt.cleanup()
-
-    def restart(self):
-        old_task_attempt = self.selected_task_attempt
-        old_task_attempt.kill('TaskAttempt killed because it was unresponsive.')
-        if not get_setting('PRESERVE_ON_FAILURE'):
-            old_task_attempt.cleanup()
-
-        max_retries = int(get_setting('MAXIMUM_TASK_RETRIES'))
-        if self.attempt_number - 1 < max_retries:
-            self.add_timepoint(
-                'TaskAttempt %s was unresponsive. Restarting task with retry %s of %s'
-                % (old_task_attempt.uuid, self.attempt_number, max_retries),
-                is_error=True)
-            tasks.run_task(self.uuid)            
-        else:
-            self.fail('TaskAttempt %s failed' % old_task_attempt.uuid,
-                      detail='TaskAttempt %s was unresponsive, '\
-                      'and Task %s already reached max retries of %s.' %
-                      (old_task_attempt.uuid,
-                       old_task_attempt.task.uuid,
-                       max_retries))
-
-    def has_been_run(self):
-        return self.attempt_number != 0
-    
-    def set_datetime_finished(self):
-        self.datetime_finished = timezone.now()
-        self.save()
+            async.kill_task_attempt(task_attempt.uuid, kill_message)
 
     @classmethod
     def create_from_input_set(cls, input_set, step_run):
+        index = input_set.index
+        if step_run.tasks.filter(index=index).count() > 0:
+            raise TaskAlreadyExistsException
         task = Task.objects.create(
             step_run=step_run,
             command=step_run.command,
             interpreter=step_run.interpreter,
             environment=step_run.template.environment,
             resources=step_run.template.resources,
+            index=index,
         )
         for input in input_set:
             TaskInput.objects.create(
@@ -145,20 +136,26 @@ class Task(BaseModel):
                 type=step_run_output.type,
                 task=task,
                 source=step_run_output.source)
-        task.rendered_command = task.render_command()
-        task.save()
+        task = task.setattrs_and_save_with_retries(
+            { 'rendered_command': task.render_command() })
         task.add_timepoint('Task %s was created' % task.uuid)
         step_run.add_timepoint('Child Task %s was created' % task.uuid)
         return task
 
     def create_and_activate_attempt(self):
-        task_attempt = TaskAttempt.create_from_task(self)
-        self.selected_task_attempt = task_attempt
-        self.save()
-
-        self.add_timepoint('Created child TaskAttempt %s' % task_attempt.uuid)
+        try:
+            task_attempt = TaskAttempt.create_from_task(self)
+            self.setattrs_and_save_with_retries({
+                'selected_task_attempt': task_attempt })
+            self.add_timepoint('Created child TaskAttempt %s' % task_attempt.uuid)
+        except ConcurrentModificationError as e:
+            task_attempt.add_timepoint(
+                'Failed to update task with newly created task_attempt',
+                detail=e.message,
+                is_error=True)
+            task_attempt.fail()
+            raise
         task_attempt.add_timepoint('TaskAttempt %s was created' % task_attempt.uuid)
-
         return task_attempt
 
     def get_input_context(self):
@@ -196,7 +193,6 @@ class Task(BaseModel):
     def add_timepoint(self, message, detail='', is_error=False):
         timepoint = TaskTimepoint.objects.create(
             message=message, task=self, detail=detail, is_error=is_error)
-        timepoint.save()
 
 
 class TaskInput(BaseModel):
@@ -207,7 +203,7 @@ class TaskInput(BaseModel):
     data_object = models.ForeignKey('DataObject', on_delete=models.PROTECT)
     channel = models.CharField(max_length=255)
     type = models.CharField(max_length = 255,
-                            choices=DataObject.TYPE_CHOICES)
+                            choices=DataObject.DATA_TYPE_CHOICES)
 
 
 class TaskOutput(BaseModel):
@@ -217,19 +213,22 @@ class TaskOutput(BaseModel):
                              on_delete=models.CASCADE)
     channel = models.CharField(max_length=255)
     type = models.CharField(max_length = 255,
-                            choices=DataObject.TYPE_CHOICES)
-    source = jsonfield.JSONField(null=True)
-    data_object = models.ForeignKey('DataObject', on_delete=models.PROTECT, null=True)
+                            choices=DataObject.DATA_TYPE_CHOICES)
+    source = jsonfield.JSONField(null=True, blank=True)
+    data_object = models.ForeignKey('DataObject', on_delete=models.PROTECT,
+                                    null=True, blank=True)
 
     def pull_data_object(self):
         attempt_output = self.task.selected_task_attempt.get_output(self.channel)
-        self.data_object = attempt_output.data_object
-        self.save()
+        self.setattrs_and_save_with_retries({
+            'data_object': attempt_output.data_object })
 
-    def push_data_object(self):
+    def push_data_object(self, index):
         step_run_output = self.task.step_run.get_output(self.channel)
-        if not step_run_output.has_scalar():
-            step_run_output.add_data_object([], self.data_object)
+        if self.data_object.is_array:
+            raise Exception('TODO: Handle array data objects')
+        else:
+            step_run_output.push(index, self.data_object)
 
 
 class TaskTimepoint(BaseModel):
@@ -250,11 +249,10 @@ class TaskAttempt(BaseModel):
                             unique=True, max_length=255)
     datetime_created = models.DateTimeField(default=timezone.now,
                                             editable=False)
-    datetime_finished = models.DateTimeField(null=True)
+    datetime_finished = models.DateTimeField(null=True, blank=True)
     task = models.ForeignKey('Task',
                              related_name='task_attempts',
                              on_delete=models.CASCADE)
-    # container_id = models.CharField(max_length=255, null=True)
     interpreter = models.CharField(max_length=1024)
     rendered_command = models.TextField()
     environment = jsonfield.JSONField()
@@ -267,15 +265,12 @@ class TaskAttempt(BaseModel):
     status_is_cleaned_up = models.BooleanField(default=False)
 
     def heartbeat(self):
-        task_attempt = TaskAttempt.objects.get(uuid=self.uuid)
-        task_attempt.save()
+        # Saving with an empty set of attributes will update
+        # last_heartbeat since auto_now=True
+        self.setattrs_and_save_with_retries({})
 
     def get_output(self, channel):
         return self.outputs.get(channel=channel)
-
-    def set_datetime_finished(self):
-        self.datetime_finished = timezone.now()
-        self.save()
 
     def fail(self):
         task_attempt = TaskAttempt.objects.get(uuid=self.uuid)
@@ -298,10 +293,10 @@ class TaskAttempt(BaseModel):
             pass
 
     def finish(self):
-        self.set_datetime_finished()
-        self.status_is_finished = True
-        self.status_is_running = False
-        self.save()
+        self.setattrs_and_save_with_retries({
+            'datetime_finished': timezone.now(),
+            'status_is_finished': True,
+            'status_is_running': False })
         try:
             task = self.task_as_selected
         except ObjectDoesNotExist:
@@ -318,7 +313,6 @@ class TaskAttempt(BaseModel):
     def add_timepoint(self, message, detail='', is_error=False):
         timepoint = TaskAttemptTimepoint.objects.create(
             message=message, task_attempt=self, detail=detail, is_error=is_error)
-        timepoint.save()
 
     @classmethod
     def create_from_task(cls, task):
@@ -390,9 +384,9 @@ class TaskAttempt(BaseModel):
         return os.path.join(self.get_log_dir(), 'stderr.log')
 
     def kill(self, kill_message):
-        self.status_is_killed = True
-        self.status_is_running = False
-        self.save()
+        self.setattrs_and_save_with_retries(
+            {'status_is_killed': True,
+             'status_is_running': False})
         self.add_timepoint('TaskAttempt killed', detail=kill_message, is_error=True)
 
     def cleanup(self):
@@ -401,32 +395,10 @@ class TaskAttempt(BaseModel):
         if get_setting('PRESERVE_ALL'):
             self.add_timepoint('Skipping cleanup')
             return
-        tasks.cleanup_task_attempt(self.uuid)
-        self.status_is_cleaned_up = True
-        self.save()
+        async.cleanup_task_attempt(self.uuid)
+        self.setattrs_and_save_with_retries({
+            'status_is_cleaned_up': True })
         self.add_timepoint('Cleaning up')
-        
-#    def get_provenance_data(self, files=None, tasks=None, edges=None):
-#        if files is None:
-#            files = set()
-#        if tasks is None:
-#            tasks = set()
-#        if edges is None:
-#            edges = set()
-
-#        tasks.add(self)
-
-#        for input in self.task.inputs.all():
-#            data = input.data_object
-#            if data.type == 'file':
-#                files.add(data)
-#                edges.add((data.id.hex, self.id.hex))
-#                data.get_provenance_data(files, tasks, edges)
-#            else:
-                # TODO - nonfile data types
-#                pass
-
-#        return files, tasks, edges
 
 
 class TaskAttemptInput(BaseModel):
@@ -437,7 +409,8 @@ class TaskAttemptInput(BaseModel):
     data_object = models.ForeignKey('DataObject', on_delete=models.PROTECT)
     channel = models.CharField(max_length=255)
     type = models.CharField(max_length = 255,
-                            choices=DataObject.TYPE_CHOICES)
+                            choices=DataObject.DATA_TYPE_CHOICES)
+
 
 class TaskAttemptOutput(BaseModel):
 
@@ -453,16 +426,19 @@ class TaskAttemptOutput(BaseModel):
     data_object = models.OneToOneField(
         'DataObject',
         null=True,
+        blank=True,
         related_name='task_attempt_output',
         on_delete=models.PROTECT)
     channel = models.CharField(max_length=255)
     type = models.CharField(max_length = 255,
-                            choices=DataObject.TYPE_CHOICES)
-    source = jsonfield.JSONField(null=True)
+                            choices=DataObject.DATA_TYPE_CHOICES)
+    source = jsonfield.JSONField(null=True, blank=True)
 
 
 class TaskAttemptLogFile(BaseModel):
 
+    uuid = models.CharField(default=uuidstr, editable=False,
+                            unique=True, max_length=255)
     task_attempt = models.ForeignKey(
         'TaskAttempt',
         related_name='log_files',
@@ -471,21 +447,22 @@ class TaskAttemptLogFile(BaseModel):
     file = models.OneToOneField(
         'DataObject',
         null=True,
+        blank=True,
         related_name='task_attempt_log_file',
         on_delete=models.PROTECT)
+    datetime_created = models.DateTimeField(default=timezone.now,
+                                            editable=False)
 
-    def _post_save(self):
+    def initialize_file(self):
         # Create a blank file_data_object on save.
         # The client will upload the file to this object.
-        if self.file is None:
-            self.file = FileDataObject.objects.create(
-                source_type='log', type='file', filename=self.log_name)
-            self.file.initialize()
-            self.save()
-
-@receiver(models.signals.post_save, sender=TaskAttemptLogFile)
-def _post_save_task_attempt_log_file_signal_receiver(sender, instance, **kwargs):
-    instance._post_save()
+        if self.file is not None:
+            raise Exception('FileDataObject already exists')
+        file = FileDataObject.objects.create(
+            source_type='log', type='file', filename=self.log_name)
+        self.setattrs_and_save_with_retries(
+            {'file': file})
+        return self.file
 
 
 class TaskAttemptTimepoint(BaseModel):

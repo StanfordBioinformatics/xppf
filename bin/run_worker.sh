@@ -9,4 +9,4 @@ LOOM_LOG_LEVEL=${LOOM_LOG_LEVEL:-$DEFAULT_LOG_LEVEL}
 LOOM_WORKER_CELERY_CONCURRENCY=${LOOM_WORKER_CELERY_CONCURRENCY:-$DEFAULT_CELERY_CONCURRENCY}
 
 # omitting --without-gossip causes missed heartbeat errors
-celery -c ${LOOM_WORKER_CELERY_CONCURRENCY} -A loomengine.master.master -l ${LOOM_LOG_LEVEL} -P eventlet worker --workdir=${BIN_PATH}/../loomengine/master --without-gossip
+celery -A loomengine.master.master -P eventlet worker --concurrency=${LOOM_WORKER_CELERY_CONCURRENCY} --loglevel=${LOOM_LOG_LEVEL} --workdir=${BIN_PATH}/../loomengine/master --without-gossip
