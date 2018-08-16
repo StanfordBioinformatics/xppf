@@ -395,9 +395,11 @@ OutputParser schema
 ============  ========  =======================  =================  ===============
 field         required  default                  type               example
 ============  ========  =======================  =================  ===============
-type          yes                                string             'delimited'
+type*          yes                                string             'delimited'
 options       no                                 ParserOptions      {'delimiter':' ','trim':true}
 ============  ========  =======================  =================  ===============
+
+\* Currently "delimited" is the only OutputParser type
 
 OutputSource schema
 ===================
@@ -413,4 +415,4 @@ filenames+    false                              string             ['out1.txt',
 
 \* When used with outputs with "scatter" mode, an OutputParser is required
 
-\+ Only for outputs with "scatter" mode. (No parser required.)
+\+ Only for outputs with "scatter" mode. (No parser required.) The "glob" field supports "\*", "\?", and character ranges using "[]".

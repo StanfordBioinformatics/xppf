@@ -47,7 +47,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Loom'
-copyright = u'2017, Nathan Hammond, Isaac Liao'
+copyright = u'2017-2018, Nathan Hammond, Isaac Liao'
 author = u'Nathan Hammond, Isaac Liao'
 
 # The version info for the project you're documenting, acts as replacement for
