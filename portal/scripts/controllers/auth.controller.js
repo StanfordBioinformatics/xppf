@@ -14,10 +14,7 @@
             $('#id_auth_form input').checkAndTriggerAutoFillEvent();
 
 	$scope.activeData = DataService.getAllActive();
-	if (!($scope.activeData.login_required==false)) {
-	    DataService.getLoginData();
-	}
-
+	DataService.getLoginAndVersionInfo();
         $scope.getCredentials = function(){
 	    return {username: $scope.username, password: $scope.password};
         }
@@ -40,7 +37,7 @@
 		.$promise
                 .then(function(data){
 		    // on good username and password
-		    DataService.getLoginData();
+		    DataService.getLoginAndVersionInfo();
 		    $window.location = '#/runs';
                 })
                 .catch(function(data){

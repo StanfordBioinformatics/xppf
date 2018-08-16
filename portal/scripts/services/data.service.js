@@ -22,7 +22,7 @@
 	this.getImportedFiles = getImportedFiles;
 	this.getResultFiles = getResultFiles;
 	this.getLogFiles = getLogFiles;
-	this.getLoginData = getLoginData;
+	this.getLoginAndVersionInfo = getLoginAndVersionInfo;
 
 	var activeData = {};
 
@@ -136,13 +136,13 @@
 		});
 	}
 
-	function getLoginData() {
+	function getLoginAndVersionInfo() {
 	    return $http.get("/api/info/")
 		.then(function(response) {
 		    activeData.username = response.data.username;
-		    activeData.loginRequired = response.data.login_required
+		    activeData.loginRequired = response.data.login_required;
+		    activeData.version = response.data.version
 		});
 	}
     }
-
 }());
