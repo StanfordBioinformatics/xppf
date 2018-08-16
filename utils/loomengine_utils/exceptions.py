@@ -16,6 +16,9 @@ class ResourceCountError(LoomengineUtilsError):
 class ExportManagerError(LoomengineUtilsError):
     pass
 
+class FileAlreadyExistsError(ExportManagerError):
+    pass
+
 class FileUtilsError(LoomengineUtilsError):
     pass
 

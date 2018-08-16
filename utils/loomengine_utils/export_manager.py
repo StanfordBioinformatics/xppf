@@ -4,7 +4,8 @@ import logging
 import os
 import yaml
 
-from .exceptions import LoomengineUtilsError, ExportManagerError
+from .exceptions import LoomengineUtilsError, ExportManagerError, \
+    FileAlreadyExistsError
 from .file_utils import File
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ class ExportManager(object):
             destination = File(
                 destination_file_url, self.storage_settings, retry=retry)
             if destination.exists():
-                raise ExportManagerError(
+                raise FileAlreadyExistsError(
                     'File already exists at %s' % destination_file_url)
             logger.info('...copying file to %s' % (
                 destination.get_url()))
