@@ -1,6 +1,18 @@
 ---
+- name: Get server IP
+  hosts: localhost
+  connection: local
+  vars_files:
+  - vars/common.yml
+  - vars/gcloud_server.yml
+  tasks:
+  - include: tasks/gcloud_get_server_instance_name.yml
+  - add_host:
+      name: "{{ (client_uses_internal_ip) | ternary(hostvars[instance_name].gce_private_ip, hostvars[instance_name].gce_public_ip) }}"
+      groups: server_ip
+
 - name: Stop all the components of a loom server
-  hosts: "{{lookup('env','LOOM_SERVER_NAME')}}"
+  hosts: server_ip
   remote_user: "{{loom_remote_user}}"
   vars_files:
     - vars/common.yml
