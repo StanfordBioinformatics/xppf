@@ -41,7 +41,8 @@ class TestExamples(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tempdir)
         for run_tag in self.run_tags:
-            args = self.run_parser.parse_args(['delete', '-y', ':%s' % run_tag])
+            args = self.run_parser.parse_args(
+                ['delete', '-y', ':%s' % run_tag])
             run_client = loomengine.run.RunClient(args, silent=True)
             try:
                 run_client.run()
@@ -62,21 +63,10 @@ class TestExamples(unittest.TestCase):
                 pass
             args = self.template_parser.parse_args(
                 ['list', ':%s' % template_tag])
-            template_list_client = loomengine.template.Template(args, silent=True)
+            template_list_client = loomengine.template.Template(
+                args, silent=True)
             self._poll_for_n(template_list_client, n=0,
                              error_message='Failed to delete template')
-
-        #for file_uuid in self.file_uuids:
-        #    args = self.file_parser.parse_args(['delete', '-y', '@%s' % file_uuid])
-        #    file_client = loomengine.file_client.FileClient(args, silent=True)
-        #    try:
-        #        file_client.run()
-        #    except SystemExit:
-        #        pass
-        #    args = self.file_parser.parse_args(['list', '@%s' % file_uuid])
-        #    file_list_client = loomengine.file_client.FileClient(args, silent=True)
-        #    self._poll_for_n(file_list_client, n=0,
-        #                     error_message='Failed to delete file')
 
     def testExamples(self):
         # self._check_examples_list()
@@ -103,7 +93,6 @@ class TestExamples(unittest.TestCase):
             else:
                 raise Exception(error_message)
 
-
     def _check_examples_list(self):
         # Verify that examples in this test match those listed by the client.
         args = self.example_parser.parse_args(['list'])
@@ -125,12 +114,13 @@ class TestExamples(unittest.TestCase):
             self.tempdir, example, example+'.yaml')
         args = self.template_parser.parse_args(
             ['import', template_path, '-f', '-r', '-t', template_tag])
-        template_import_client = loomengine.template.Template(args, silent=True)
+        template_import_client = loomengine.template.Template(
+            args, silent=True)
         template_import_client.run()
         args = self.template_parser.parse_args(['list', ':%s' % template_tag])
         template_list_client = loomengine.template.Template(args, silent=True)
         result = self._poll_for_n(template_list_client, n=1,
-                         error_message='Failed to import template')
+                                  error_message='Failed to import template')
         template = requests.get(result[0]['url']).json()
         self._get_files_from_template(template)
         self.template_tags.add(template_tag)
@@ -160,14 +150,15 @@ class TestExamples(unittest.TestCase):
         self._poll_for_run_success(run_list_client,
                                    error_message='Run failed')
 
-
-    def _poll_for_run_success(self, client, timeout_seconds=1800, sleep_seconds=20,
-                    error_message='ERROR! Timed out'):
+    def _poll_for_run_success(
+            self, client, timeout_seconds=1800, sleep_seconds=20,
+            error_message='ERROR! Timed out'):
         start = datetime.now()
         while True:
             try:
                 result = client.run()
-                assert len(result)==1, 'Expected 1 run, found %s' % len(result)
+                assert len(result) == 1, \
+                    'Expected 1 run, found %s' % len(result)
                 if result[0].get('status') == 'Finished':
                     return result[0]
                 elif result[0].get('status') == 'Failed':
@@ -179,7 +170,8 @@ class TestExamples(unittest.TestCase):
                 elif result[0].get('status') == 'Running':
                     pass
                 else:
-                    raise Exception('Unknown run status "%s"' % result[0].get('status'))
+                    raise Exception(
+                        'Unknown run status "%s"' % result[0].get('status'))
             except SystemExit:
                 pass
             if (datetime.now() - start).total_seconds() < timeout_seconds:
@@ -208,5 +200,5 @@ class TestExamples(unittest.TestCase):
             self.file_uuids.add(contents['uuid'])
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     unittest.main()

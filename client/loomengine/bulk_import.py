@@ -1,13 +1,7 @@
 #!/usr/bin/env python
+import argparse
 import os
 import sys
-
-if __name__ == "__main__" and __package__ is None:
-    rootdir=os.path.abspath('../..')
-    sys.path.append(rootdir)
-
-import argparse
-    
 from loomengine import server
 from loomengine.common import verify_has_connection_settings, get_server_url, \
     verify_server_is_running, get_token
@@ -25,7 +19,7 @@ class BulkImport(object):
         if args is None:
             args = self._get_args()
         self.args = args
-        self.silent=silent
+        self.silent = silent
         verify_has_connection_settings()
         server_url = get_server_url()
         verify_server_is_running(url=server_url)
@@ -51,7 +45,7 @@ class BulkImport(object):
         parser.add_argument(
             '-k', '--link-files', action='store_true',
             default=False,
-            help='link to existing files instead of copying to storage '\
+            help='link to existing files instead of copying to storage '
             'managed by Loom')
         parser.add_argument(
             '-r', '--retry', action='store_true',
@@ -66,12 +60,13 @@ class BulkImport(object):
                 link_files=self.args.link_files,
                 retry=self.args.retry)
         except APIError as e:
-            raise SystemExit('ERROR! An external API failed. This may be transient. '\
-                             'Try again, and consider using "--retry", especially '\
-                             'if this step is automated. Original error: "%s"' % e)
+            raise SystemExit(
+                'ERROR! An external API failed. This may be transient. '
+                'Try again, and consider using "--retry", especially '
+                'if this step is automated. Original error: "%s"' % e)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! %s" % e.message)
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = BulkImport().run()

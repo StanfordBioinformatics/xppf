@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import argparse
 import glob
 import os
@@ -22,7 +21,7 @@ class AbstractFileSubcommand(object):
         """Common init tasks for all File subcommands
         """
         self.args = args
-        self.silent=silent
+        self.silent = silent
         verify_has_connection_settings()
         server_url = get_server_url()
         verify_server_is_running(url=server_url)
@@ -45,7 +44,7 @@ class FileImport(AbstractFileSubcommand):
     def get_parser(cls, parser):
         parser.add_argument(
             'files',
-            metavar='FILE', nargs='+', help='file path or Google Storage URL '\
+            metavar='FILE', nargs='+', help='file path or Google Storage URL '
             'of file(s) to be imported. Wildcards are allowed')
         parser.add_argument(
             '-c', '--comments',
@@ -54,7 +53,7 @@ class FileImport(AbstractFileSubcommand):
         parser.add_argument(
             '-k', '--link', action='store_true',
             default=False,
-            help='link to existing files instead of copying to storage '\
+            help='link to existing files instead of copying to storage '
             'managed by Loom')
         metadata_group = parser.add_mutually_exclusive_group(required=False)
         metadata_group.add_argument(
@@ -67,7 +66,7 @@ class FileImport(AbstractFileSubcommand):
             help='ignore metadata if present')
         parser.add_argument('-f', '--force-duplicates', action='store_true',
                             default=False,
-                            help='force upload even if another file with '\
+                            help='force upload even if another file with '
                             'the same name and md5 exists')
         parser.add_argument('-r', '--retry', action='store_true',
                             default=False,
@@ -90,9 +89,10 @@ class FileImport(AbstractFileSubcommand):
                 retry=self.args.retry
             )
         except APIError as e:
-            raise SystemExit('ERROR! An external API failed. This may be transient. '\
-                             'Try again, and consider using "--retry", especially '\
-                             'if this step is automated. Original error: "%s"' % e)
+            raise SystemExit(
+                'ERROR! An external API failed. This may be transient. '
+                'Try again, and consider using "--retry", especially '
+                'if this step is automated. Original error: "%s"' % e)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to import files: '%s'" % e)
         self._apply_tags(files_imported)
@@ -114,7 +114,7 @@ class FileImport(AbstractFileSubcommand):
                         files_imported[0].get('uuid'), tag_data)
                 except LoomengineUtilsError as e:
                     raise SystemExit("ERROR! Failed to create tag: '%s'" % e)
-                self._print('File "%s@%s" has been tagged as "%s"' % \
+                self._print('File "%s@%s" has been tagged as "%s"' %
                             (files_imported[0]['value'].get('filename'),
                              files_imported[0].get('uuid'),
                              tag.get('tag')))
@@ -130,7 +130,7 @@ class FileImport(AbstractFileSubcommand):
                         file_imported.get('uuid'), label_data)
                 except LoomengineUtilsError as e:
                     raise SystemExit("ERROR! Failed to create label: '%s'" % e)
-                self._print('File "%s@%s" has been labeled as "%s"' % \
+                self._print('File "%s@%s" has been labeled as "%s"' %
                             (file_imported['value'].get('filename'),
                              file_imported.get('uuid'),
                              label.get('label')))
@@ -159,7 +159,8 @@ class FileExport(AbstractFileSubcommand):
             '-k', '--link',
             default=False,
             action='store_true',
-            help='do not export files, just metadata with link to original files')
+            help='do not export files, '
+            'just metadata with link to original files')
         parser.add_argument(
             '-r', '--retry', action='store_true',
             default=False,
@@ -176,7 +177,7 @@ class FileExport(AbstractFileSubcommand):
             while True:
                 try:
                     data = self.connection.get_data_object_index_with_limit(
-		        limit=limit, offset=offset,
+                        limit=limit, offset=offset,
                         query_string=file_id, type='file')
                 except LoomengineUtilsError as e:
                     raise SystemExit(
@@ -216,9 +217,10 @@ class FileExport(AbstractFileSubcommand):
                 except LoomengineUtilsError as e:
                     raise SystemExit("ERROR! Failed to export files: '%s'" % e)
         except APIError as e:
-            raise SystemExit('ERROR! An external API failed. This may be transient. '\
-                             'Try again, and consider using "--retry", especially '\
-                             'if this step is automated. Original error: "%s"' % e)
+            raise SystemExit(
+                'ERROR! An external API failed. This may be transient. '
+                'Try again, and consider using "--retry", especially '
+                'if this step is automated. Original error: "%s"' % e)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! %s" % e.message)
 
@@ -240,7 +242,7 @@ class FileList(AbstractFileSubcommand):
             '-t', '--type',
             choices=['imported', 'result', 'log', 'all'],
             default='imported',
-            help='List only files of the specified type. '\
+            help='List only files of the specified type. '
             '(ignored when FILE_IDENTIFIER is given)')
         parser.add_argument('-l', '--label', metavar='LABEL', action='append',
                             help='Filter by label')
@@ -249,11 +251,11 @@ class FileList(AbstractFileSubcommand):
 
     def run(self):
         if self.args.file_id:
-            source_type=None
+            source_type = None
         else:
-            source_type=self.args.type
-        offset=0
-        limit=10
+            source_type = self.args.type
+        offset = 0
+        limit = 10
         while True:
             try:
                 data = self.connection.get_data_object_index_with_limit(
@@ -261,7 +263,8 @@ class FileList(AbstractFileSubcommand):
                     query_string=self.args.file_id, source_type=source_type,
                     labels=self.args.label, type='file')
             except LoomengineUtilsError as e:
-                raise SystemExit("ERROR! Failed to get data object list: '%s'" % e)
+                raise SystemExit(
+                    "ERROR! Failed to get data object list: '%s'" % e)
             if offset == 0:
                 self._print('[showing %s files]' % data.get('count'))
             self._list_files(data['results'])
@@ -280,7 +283,8 @@ class FileList(AbstractFileSubcommand):
     def _render_file(self, file_data_object):
         try:
             file_identifier = '%s@%s' % (
-                file_data_object['value'].get('filename'), file_data_object['uuid'])
+                file_data_object['value'].get('filename'),
+                file_data_object['uuid'])
         except TypeError:
             file_identifier = '@%s' % file_data_object['uuid']
 
@@ -337,7 +341,7 @@ class FileDelete(AbstractFileSubcommand):
             file_data_object.get('uuid'))
         if not self.args.yes:
             user_input = raw_input(
-                'Do you really want to permanently delete file "%s"?\n'\
+                'Do you really want to permanently delete file "%s"?\n'
                 '(y)es, (n)o: '
                 % file_id)
             if user_input.lower() == 'n':
@@ -345,23 +349,28 @@ class FileDelete(AbstractFileSubcommand):
             elif user_input.lower() == 'y':
                 pass
             else:
-                raise SystemExit('ERROR! Unrecognized response "%s"' % user_input)
+                raise SystemExit(
+                    'ERROR! Unrecognized response "%s"' % user_input)
         try:
             dependencies = self.connection.get_data_object_dependencies(
                 file_data_object['uuid'])
         except LoomengineUtilsError as e:
             raise SystemExit(
                 "ERROR! Failed to get data object dependencies: '%s'" % e)
-        if len(dependencies['runs']) == 0 and len(dependencies['templates']) == 0:
+        if len(dependencies['runs']) == 0 \
+           and len(dependencies['templates']) == 0:
             try:
-                self.connection.delete_data_object(file_data_object.get('uuid'))
+                self.connection.delete_data_object(
+                    file_data_object.get('uuid'))
             except LoomengineUtilsError as e:
-                raise SystemExit("ERROR! Failed to delete data object: '%s'" % e)
+                raise SystemExit(
+                    "ERROR! Failed to delete data object: '%s'" % e)
             self._print("Deleted file %s" % file_id)
         else:
-            raise SystemExit("ERROR! You cannot delete file %s "\
-                "because it is still in use. "\
-                "You must delete the following objects "\
+            raise SystemExit(
+                "ERROR! You cannot delete file %s "
+                "because it is still in use. "
+                "You must delete the following objects "
                 "before deleting this file:\n\n%s" % (
                     file_id, self._render_file_dependencies(dependencies)))
 
@@ -381,13 +390,12 @@ class FileClient(object):
     """
 
     def __init__(self, args=None, silent=False):
-        
         # Args may be given as an input argument for testing purposes.
         # Otherwise get them from the parser.
         if args is None:
             args = self._get_args()
         self.args = args
-        self.silent=silent
+        self.silent = silent
 
     def _get_args(self):
         parser = self.get_parser()
@@ -412,7 +420,8 @@ class FileClient(object):
         FileTag.get_parser(tag_subparser)
         tag_subparser.set_defaults(SubSubcommandClass=FileTag)
 
-        label_subparser = subparsers.add_parser('label', help='manage file labels')
+        label_subparser = subparsers.add_parser(
+            'label', help='manage file labels')
         FileLabel.get_parser(label_subparser)
         label_subparser.set_defaults(SubSubcommandClass=FileLabel)
 
@@ -429,12 +438,13 @@ class FileClient(object):
         delete_subparser = subparsers.add_parser('delete', help='delete file')
         FileDelete.get_parser(delete_subparser)
         delete_subparser.set_defaults(SubSubcommandClass=FileDelete)
-                       
+
         return parser
 
     def run(self):
-        return self.args.SubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = FileClient().run()

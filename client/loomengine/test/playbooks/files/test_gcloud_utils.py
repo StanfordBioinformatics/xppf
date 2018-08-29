@@ -2,12 +2,8 @@ import os
 import sys
 import unittest
 
-playbook_files_path = os.path.abspath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                 '..','..','..','playbooks','files'))
-sys.path.append(playbook_files_path)
+import loomengine.playbooks.files.gcloud_utils as gu
 
-import gcloud_utils as gu
 
 class TestGcloudUtils(unittest.TestCase):
 
@@ -18,7 +14,8 @@ class TestGcloudUtils(unittest.TestCase):
         max_length = 63
         worker_name = gu.get_worker_name(hostname, step_name, attempt_id,
                                          max_length, silent=True)
-        self.assertEqual(worker_name, '%s-%s-%s' % (hostname, step_name, attempt_id))
+        self.assertEqual(worker_name, '%s-%s-%s' % (
+            hostname, step_name, attempt_id))
 
     def testGetWorkerNameTrimEven(self):
         hostname = 'hostname'
@@ -39,14 +36,15 @@ class TestGcloudUtils(unittest.TestCase):
         self.assertEqual(worker_name, 'hostna-stepn-12345678')
 
     def testSanitizeInstanceName(self):
-        name = gu._sanitize_instance_name('--some_?&-things-nevr-change--', 100)
+        name = gu._sanitize_instance_name(
+            '--some_?&-things-nevr-change--', 100)
         self.assertEqual(name, 'some-things-nevr-change')
-    
+
     def testSanitizeServerName(self):
         name = gu.sanitize_server_name('--some_?&-things-nevr-change--', 10,
                                        silent=True)
         self.assertEqual(name, 'some-things-nevr-change'[:10])
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import argparse
 from collections import OrderedDict
 import glob
@@ -12,11 +11,14 @@ EXAMPLE_INDEX = [
     ('join_two_words', 'simplest example'),
     ('capitalize_words', 'array data, iterating over an array input'),
     ('join_array_of_words', 'array data, gather mode on an input'),
-    ('split_words_into_array', 'array data, scatter mode on an output, output parsers'),
-    ('add_then_multiply', 'multistep templates, connecting inputs and outputs, custom interpreter'),
+    ('split_words_into_array',
+     'array data, scatter mode on an output, output parsers'),
+    ('add_then_multiply',
+     'multistep templates, connecting inputs and outputs, custom interpreter'),
     ('building_blocks', 'reusing templates'),
     ('search_file', 'file inputs'),
-    ('word_combinations', 'scatter-gather, input groups, output mode gather(n)'),
+    ('word_combinations',
+     'scatter-gather, input groups, output mode gather(n)'),
     ('sentence_scoring', 'nested scatter-gather'),
 ]
 
@@ -41,8 +43,10 @@ class ExampleExport(object):
 
     def run(self):
         example_names = OrderedDict(EXAMPLE_INDEX).keys()
-        if not self.args.example_name in example_names:
-            raise SystemExit('ERROR! Unknown example "%s".\nChoose from %s' % (self.args.example_name, example_names))
+        if self.args.example_name not in example_names:
+            raise SystemExit(
+                'ERROR! Unknown example "%s".\nChoose from %s'
+                % (self.args.example_name, example_names))
         example_path = os.path.join(EXAMPLE_DIR, self.args.example_name)
         if self.args.destination:
             destination = self.args.destination
@@ -58,7 +62,8 @@ class ExampleExport(object):
         try:
             shutil.copytree(example_path, target_dir)
         except Exception as e:
-            raise SystemExit('Error exporting example to "%s": %s' % (target_dir, e))
+            raise SystemExit(
+                'Error exporting example to "%s": %s' % (target_dir, e))
         if not self.silent:
             print 'Exported example "%s"\n    to "%s"' % \
                 (os.path.basename(example_path), target_dir)
@@ -68,7 +73,7 @@ class ExampleList(object):
 
     def __init__(self, args, silent=False):
         self.args = args
-        self.silent=silent
+        self.silent = silent
 
     @classmethod
     def get_parser(cls, parser):
@@ -91,7 +96,6 @@ class Example(object):
     """
 
     def __init__(self, args=None, silent=False):
-        
         # Args may be given as an input argument for testing purposes.
         # Otherwise get them from the parser.
         if args is None:
@@ -116,7 +120,7 @@ class Example(object):
         list_subparser = subparsers.add_parser(
             'list', help='list examples')
         ExampleList.get_parser(list_subparser)
-	list_subparser.set_defaults(SubSubcommandClass=ExampleList)
+        list_subparser.set_defaults(SubSubcommandClass=ExampleList)
 
         export_subparser = subparsers.add_parser(
             'export', help='export an example to the current directory')
@@ -126,8 +130,9 @@ class Example(object):
         return parser
 
     def run(self):
-        return self.args.SubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = Example().run()

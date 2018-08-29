@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import argparse
 import jsonschema
 import os
@@ -56,14 +55,16 @@ class RunStart(AbstractRunSubcommand):
     def get_parser(cls, parser=None):
         if parser is None:
             parser = argparse.ArgumentParser(__file__)
-        parser.add_argument('template', metavar='TEMPLATE_ID', help='ID of template to run')
-        parser.add_argument('inputs', metavar='INPUT=DATA', nargs='*',
-                            help='pairs of [channel name]=[ID or value of data inputs]')
+        parser.add_argument(
+            'template', metavar='TEMPLATE_ID', help='ID of template to run')
+        parser.add_argument(
+            'inputs', metavar='INPUT=DATA', nargs='*',
+            help='pairs of [channel name]=[ID or value of data inputs]')
         parser.add_argument('-n', '--name', metavar='RUN_NAME',
                             help='run name (default is template name)')
-        parser.add_argument('-i', '--inputs-file', metavar='INPUTS_FILE',
-                            help='JSON file with inputs '\
-                            '{"channel1": "value1",...}')
+        parser.add_argument(
+            '-i', '--inputs-file', metavar='INPUTS_FILE',
+            help='JSON file with inputs {"channel1": "value1",...}')
         parser.add_argument('-e', '--notify', action='append',
                             metavar='EMAIL/URL',
                             help='recipients of completed run notifications')
@@ -83,7 +84,10 @@ class RunStart(AbstractRunSubcommand):
         for input in args.inputs:
             vals = input.split('=')
             if not len(vals) == 2 or vals[0] == '':
-                raise SystemExit('ERROR! Invalid input key-value pair "%s". Must be of the form key=value or key=value1,value2,...' % input)
+                raise SystemExit(
+                    'ERROR! Invalid input key-value pair "%s". '
+                    'Must be of the form key=value or '
+                    'key=value1,value2,...' % input)
 
     def run(self):
         run_data = {
@@ -123,7 +127,8 @@ class RunStart(AbstractRunSubcommand):
         if self.args.inputs:
             for kv_pair in self.args.inputs:
                 (channel, input_id) = kv_pair.split('=')
-                input_dict[channel] = self._parse_string_to_nested_lists(input_id)
+                input_dict[channel] = self._parse_string_to_nested_lists(
+                    input_id)
 
         inputs = []
         for (channel, contents) in input_dict.iteritems():
@@ -151,8 +156,8 @@ class RunStart(AbstractRunSubcommand):
                 tag = self.connection.post_run_tag(run.get('uuid'), tag_data)
             except LoomengineUtilsError as e:
                 raise SystemExit("ERROR! Failed to create tag: '%s'" % e)
-            self._print('Run "%s@%s" has been tagged as "%s"' % \
-	                (run.get('name'),
+            self._print('Run "%s@%s" has been tagged as "%s"' %
+                        (run.get('name'),
                          run.get('uuid'),
                          tag.get('tag')))
 
@@ -166,16 +171,16 @@ class RunStart(AbstractRunSubcommand):
                     run.get('uuid'), label_data)
             except LoomengineUtilsError as e:
                 raise SystemExit("ERROR! Failed to create label: '%s'" % e)
-            self._print('Run "%s@%s" has been labeled as "%s"' % \
-	                (run.get('name'),
+            self._print('Run "%s@%s" has been labeled as "%s"' %
+                        (run.get('name'),
                          run.get('uuid'),
                          label.get('label')))
 
     def _parse_string_to_nested_lists(self, value):
-        """e.g., convert "[[a,b,c],[d,e],[f,g]]" 
+        """e.g., convert "[[a,b,c],[d,e],[f,g]]"
         into [["a","b","c"],["d","e"],["f","g"]]
         """
-        if not re.match('\[.*\]', value.strip()):
+        if not re.match(r'\[.*\]', value.strip()):
             if '[' in value or ']' in value or ',' in value:
                 raise Exception('Missing outer brace')
             elif len(value.strip()) == 0:
@@ -187,7 +192,7 @@ class RunStart(AbstractRunSubcommand):
                     return terms[0]
                 else:
                     return terms
-                
+
         # remove outer braces
         value = value[1:-1]
         terms = []
@@ -215,6 +220,7 @@ class RunStart(AbstractRunSubcommand):
             self._parse_string_to_nested_lists(value[leftmost:len(value)]))
         return terms
 
+
 class RunRestart(RunStart):
     """Start a new run based on an existing run's template and inputs.
     """
@@ -223,14 +229,15 @@ class RunRestart(RunStart):
     def get_parser(cls, parser=None):
         if parser is None:
             parser = argparse.ArgumentParser(__file__)
-        parser.add_argument('run', metavar='RUN_ID', help='ID of run to restart')
+        parser.add_argument(
+            'run', metavar='RUN_ID', help='ID of run to restart')
         parser.add_argument('inputs', metavar='INPUT=DATA', nargs='*',
-                            help='override inputs, pairs of '\
+                            help='override inputs, pairs of '
                             '[channel name]=[ID or value of data inputs]')
         parser.add_argument('-n', '--name', metavar='RUN_NAME',
                             help='run name (default is template name)')
         parser.add_argument('-i', '--inputs-file', metavar='INPUTS_FILE',
-                            help='JSON file with inputs '\
+                            help='JSON file with inputs '
                             '{"channel1": "value1",...}')
         parser.add_argument('-e', '--notify', action='append',
                             metavar='EMAIL/URL',
@@ -272,7 +279,7 @@ class RunRestart(RunStart):
             run['uuid']))
         self._apply_tags(run)
         self._apply_labels(run)
-        
+
         return run
 
     def _get_inputs(self, old_inputs):
@@ -315,17 +322,17 @@ class RunImport(AbstractRunSubcommand):
     def get_parser(cls, parser):
         parser.add_argument(
             'run',
-            metavar='RUN_FILE', help='run to be imported, '\
-            'in YAML format',
+            metavar='RUN_FILE',
+            help='run to be imported, in YAML format',
             nargs='+')
         parser.add_argument(
             '-k', '--link-files', action='store_true',
             default=False,
-            help='link to existing files instead of copying to storage '\
+            help='link to existing files instead of copying to storage '
             'managed by Loom')
         parser.add_argument('-r', '--retry', action='store_true',
                             default=False,
-                            help='allow retries if there is a failure '\
+                            help='allow retries if there is a failure '
                             'connecting to storage')
         parser.add_argument('-t', '--tag', metavar='TAG', action='append',
                             help='tag the run when it is imported')
@@ -337,7 +344,8 @@ class RunImport(AbstractRunSubcommand):
         imported_runs = []
         try:
             for run_file in FileSet(
-                    self.args.run, self.storage_settings, retry=self.args.retry):
+                    self.args.run, self.storage_settings,
+                    retry=self.args.retry):
                 try:
                     run = self.import_manager.import_run(
                         run_file,
@@ -349,9 +357,10 @@ class RunImport(AbstractRunSubcommand):
                 self._apply_labels(run)
                 imported_runs.append(run)
         except APIError as e:
-            raise SystemExit('ERROR! An external API failed. This may be transient. '\
-                             'Try again, and consider using "--retry", especially '\
-                             'if this step is automated. Original error: "%s"' % e)
+            raise SystemExit(
+                'ERROR! An external API failed. This may be transient. '
+                'Try again, and consider using "--retry", especially '
+                'if this step is automated. Original error: "%s"' % e)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! %s" % e.message)
         return imported_runs
@@ -365,7 +374,7 @@ class RunImport(AbstractRunSubcommand):
                 tag = self.connection.post_run_tag(run.get('uuid'), tag_data)
             except LoomengineUtilsError as e:
                 raise SystemExit('ERROR! Failed to create tag: "%s"' % e)
-            self._print('Run "%s@%s" has been tagged as "%s"' % \
+            self._print('Run "%s@%s" has been tagged as "%s"' %
                         (run.get('name'),
                          run.get('uuid'),
                          tag.get('tag')))
@@ -380,10 +389,11 @@ class RunImport(AbstractRunSubcommand):
                     run.get('uuid'), label_data)
             except LoomengineUtilsError as e:
                 raise SystemExit("ERROR! Failed to create label: '%s'" % e)
-            self._print('Run "%s@%s" has been labeled as "%s"' % \
+            self._print('Run "%s@%s" has been labeled as "%s"' %
                         (run.get('name'),
                          run.get('uuid'),
                          label.get('label')))
+
 
 class RunExport(AbstractRunSubcommand):
     @classmethod
@@ -399,11 +409,12 @@ class RunExport(AbstractRunSubcommand):
         parser.add_argument(
             '-k', '--link-files', action='store_true',
             default=False,
-            help='do not export file, just metadata with link to original file')
+            help='do not export file, just metadata with link '
+            'to original file')
         parser.add_argument(
             '-r', '--retry', action='store_true',
             default=False,
-            help='allow retries if there is a failure '\
+            help='allow retries if there is a failure '
             'connecting to storage')
         return parser
 
@@ -470,7 +481,7 @@ class RunList(AbstractRunSubcommand):
         parser.add_argument(
             '-a', '--all',
             action='store_true',
-            help='list all runs, including nested children '\
+            help='list all runs, including nested children '
             '(ignored when RUN_ID is given)')
         parser.add_argument('-l', '--label', metavar='LABEL', action='append',
                             help='filter by label')
@@ -481,8 +492,8 @@ class RunList(AbstractRunSubcommand):
             parent_only = False
         else:
             parent_only = not self.args.all
-        offset=0
-        limit=10
+        offset = 0
+        limit = 10
         while True:
             try:
                 data = self.connection.get_run_index_with_limit(
@@ -545,15 +556,15 @@ class RunKill(AbstractRunSubcommand):
         run_id = "%s@%s" % (run['name'], run['uuid'])
         if not self.args.yes:
             user_input = raw_input(
-                'Do you really want to permanently kill run "%s"?\n'\
-                '(y)es, (n)o: '
-                % run_id)
+                'Do you really want to permanently kill run "%s"?\n'
+                '(y)es, (n)o: ' % run_id)
             if user_input.lower() == 'n':
                 raise SystemExit("Skipping run")
             elif user_input.lower() == 'y':
                 pass
             else:
-                raise SystemExit('ERROR! Unrecognized response "%s"' % user_input)
+                raise SystemExit(
+                    'ERROR! Unrecognized response "%s"' % user_input)
         try:
             self.connection.kill_run(run['uuid'])
         except LoomengineUtilsError as e:
@@ -603,23 +614,28 @@ class RunDelete(AbstractRunSubcommand):
                 except LoomengineUtilsError as e:
                     raise SystemExit("ERROR! Failed to delete run: '%s'" % e)
 
-        # Placing the list in reverse order makes it easier to handle outputs produced
-        # by one step and used by another where both steps are being deleted.
+        # Placing the list in reverse order makes it easier
+        # to handle outputs produced by one step and used by
+        # another where both steps are being deleted.
         run_children_to_delete = sorted(
-            run_children_to_delete, key=lambda x: x['datetime_created'], reverse=True)
+            run_children_to_delete,
+            key=lambda x: x['datetime_created'], reverse=True)
         run_outputs_to_delete = []
-        # Only delete outputs on leaf nodes. Otherwise we will try to delete them
-        # more than once. Non-leaf nodes pointing to this output have to be deleted
-        # before we are allowed to delete the leaf anyway, so outputs are always
-        # referenced by at least the leaf leaf until the leaf is deleted.
+        # Only delete outputs on leaf nodes. Otherwise we will
+        # try to delete them more than once. Non-leaf nodes pointing
+        # to this output have to be deleted before we are allowed to
+        # delete the leaf anyway, so outputs are always referenced by
+        # at least the leaf leaf until the leaf is deleted.
         if run.get('is_leaf'):
             for output in run.get('outputs', []):
-                if output.get('type') != 'file' or not self.args.keep_result_files:
+                if output.get('type') != 'file' \
+                   or not self.args.keep_result_files:
                     try:
                         data_node = self.connection.get_data_node(
                             output['data']['uuid'], expand=True)
                     except LoomengineUtilsError as e:
-                        raise SystemExit("ERROR! Failed to get data node: '%s'" % e)
+                        raise SystemExit(
+                            "ERROR! Failed to get data node: '%s'" % e)
                     run_outputs_to_delete.extend(
                         self._parse_data_objects_from_data_node_contents(
                             data_node.get('contents')))
@@ -638,12 +654,12 @@ class RunDelete(AbstractRunSubcommand):
                                 "ERROR! Failed to get task attempt: '%s'" % e)
                         for log_file in task_attempt.get('log_files', []):
                             if log_file.get('data_object'):
-                                run_outputs_to_delete.append(log_file['data_object'])
+                                run_outputs_to_delete.append(
+                                    log_file['data_object'])
         if not self.args.yes:
             user_input = raw_input(
-                'Do you really want to permanently delete run "%s"?\n'\
-                '(y)es, (n)o: '
-                % run_id)
+                'Do you really want to permanently delete run "%s"?\n'
+                '(y)es, (n)o: ' % run_id)
             if user_input.lower() == 'n':
                 raise SystemExit("Skipping run")
             elif user_input.lower() == 'y':
@@ -652,7 +668,7 @@ class RunDelete(AbstractRunSubcommand):
                 raise SystemExit('Unrecognized response "%s"' % user_input)
         try:
             dependencies = self.connection.get_run_dependencies(
-            run.get('uuid'))
+                run.get('uuid'))
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to get run dependencies: '%s'" % e)
 
@@ -667,9 +683,10 @@ class RunDelete(AbstractRunSubcommand):
             for data_object in run_outputs_to_delete:
                 self._delete_data_object(data_object)
         else:
-            self._print("Cannot delete run %s because it is contained by other "\
-                        "run(s). You must delete the following runs before "\
-                        "deleting this run." % run_id)
+            self._print(
+                "Cannot delete run %s because it is contained by other "
+                "run(s). You must delete the following runs before "
+                "deleting this run." % run_id)
             for run in dependencies.get('runs', []):
                 self._print("  run %s@%s" % (run['name'], run['uuid']))
 
@@ -680,20 +697,22 @@ class RunDelete(AbstractRunSubcommand):
         except LoomengineUtilsError as e:
             raise SystemExit(
                 "ERROR! Failed to get data object dependencies: '%s'" % e)
-        if len(dependencies['runs']) == 0 and len(dependencies['templates']) == 0:
+        if len(dependencies['runs']) == 0 \
+           and len(dependencies['templates']) == 0:
             if data_object.get('type') == 'file':
                 file_id = "%s@%s" % (
                     data_object['value']['filename'], data_object['uuid'])
                 if not self.args.yes:
                     user_input = raw_input(
-                        'Do you really want to delete result file "%s"?\n'\
+                        'Do you really want to delete result file "%s"?\n'
                         '(y)es, (n)o: ' % file_id)
                     if user_input.lower() == 'n':
                         raise SystemExit("Skipping file")
                     elif user_input.lower() == 'y':
                         pass
                     else:
-                        raise SystemExit('Unrecognized response "%s"' % user_input)
+                        raise SystemExit(
+                            'Unrecognized response "%s"' % user_input)
                 try:
                     self.connection.delete_data_object(data_object['uuid'])
                 except LoomengineUtilsError as e:
@@ -708,16 +727,16 @@ class RunDelete(AbstractRunSubcommand):
                         "ERROR! Failed to delete data object: '%s'" % e)
         else:
             if len(dependencies['runs']) > 0:
-                self._print("Cannot delete file %s "\
-                            "because it is contained by other run(s). "\
-                            "You must delete the following runs "\
+                self._print("Cannot delete file %s "
+                            "because it is contained by other run(s). "
+                            "You must delete the following runs "
                             "before deleting this file." % run_id)
                 for run in dependencies.get('runs', []):
                     self._print("  run %s@%s" % (run['name'], run['uuid']))
             if len(dependencies['templates']) > 0:
-                self._print("Cannot delete file %s "\
-                            "because it is contained by other template(s). "\
-                            "You must delete the following templates "\
+                self._print("Cannot delete file %s "
+                            "because it is contained by other template(s). "
+                            "You must delete the following templates "
                             "before deleting this file." % run_id)
                 for template in dependencies.get('templates', []):
                     self._print("  template %s@%s" % (
@@ -728,10 +747,11 @@ class RunDelete(AbstractRunSubcommand):
             if not contents:
                 return []
             else:
-                return [contents,]
+                return [contents]
         data_objects = []
         for child in contents:
-            data_objects.extend(self._parse_data_objects_from_data_node_contents(child))
+            data_objects.extend(
+                self._parse_data_objects_from_data_node_contents(child))
         return data_objects
 
 
@@ -743,7 +763,7 @@ class RunClient(object):
         if args is None:
             args = self._get_args()
         self.args = args
-        self.silent=silent
+        self.silent = silent
 
     def _get_args(self):
         parser = self.get_parser()
@@ -756,12 +776,13 @@ class RunClient(object):
 
         subparsers = parser.add_subparsers()
 
-        start_subparser = subparsers.add_parser('start', help='start a new run')
+        start_subparser = subparsers.add_parser(
+            'start', help='start a new run')
         RunStart.get_parser(start_subparser)
         start_subparser.set_defaults(SubSubcommandClass=RunStart)
 
         restart_subparser = subparsers.add_parser(
-            'restart', help="start a new run, using an existing run's "\
+            'restart', help="start a new run, using an existing run's "
             "template and inputs")
         RunRestart.get_parser(restart_subparser)
         restart_subparser.set_defaults(SubSubcommandClass=RunRestart)
@@ -774,25 +795,26 @@ class RunClient(object):
         list_subparser = subparsers.add_parser(
             'list', help='list runs')
         RunList.get_parser(list_subparser)
-	list_subparser.set_defaults(SubSubcommandClass=RunList)
+        list_subparser.set_defaults(SubSubcommandClass=RunList)
 
         tag_subparser = subparsers.add_parser('tag', help='manage run tags')
         RunTag.get_parser(tag_subparser)
         tag_subparser.set_defaults(SubSubcommandClass=RunTag)
 
-        label_subparser = subparsers.add_parser('label', help='manage run labels')
+        label_subparser = subparsers.add_parser(
+            'label', help='manage run labels')
         RunLabel.get_parser(label_subparser)
         label_subparser.set_defaults(SubSubcommandClass=RunLabel)
 
         import_subparser = subparsers.add_parser(
             'import', help='import runs')
         RunImport.get_parser(import_subparser)
-	import_subparser.set_defaults(SubSubcommandClass=RunImport)
+        import_subparser.set_defaults(SubSubcommandClass=RunImport)
 
         export_subparser = subparsers.add_parser(
             'export', help='export runs')
         RunExport.get_parser(export_subparser)
-	export_subparser.set_defaults(SubSubcommandClass=RunExport)
+        export_subparser.set_defaults(SubSubcommandClass=RunExport)
 
         delete_subparser = subparsers.add_parser(
             'delete', help='delete run')
@@ -802,7 +824,8 @@ class RunClient(object):
         return parser
 
     def run(self):
-        return self.args.SubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
 file_input_schema = {
@@ -817,5 +840,5 @@ file_input_schema = {
 }
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     RunClient().run()

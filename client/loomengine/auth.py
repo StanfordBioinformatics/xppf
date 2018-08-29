@@ -9,6 +9,7 @@ from loomengine.common import verify_has_connection_settings, \
 from loomengine_utils.connection import Connection
 from requests.exceptions import HTTPError
 
+
 class AuthClient(object):
 
     def __init__(self, args=None, silent=False):
@@ -19,7 +20,7 @@ class AuthClient(object):
         server_url = get_server_url()
         verify_server_is_running(url=server_url)
         self.args = args
-        self.silent=silent
+        self.silent = silent
         self._set_run_function()
         self.connection = Connection(server_url, token=None)
 
@@ -60,6 +61,7 @@ class AuthClient(object):
     def print_token(self):
         print get_token()
 
+
 def get_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser(__file__)
@@ -71,7 +73,7 @@ def get_parser(parser=None):
     login_parser.add_argument(
         '--password', '-p', metavar='PASSWORD',
         default=None,
-        help='Optional. Wait for the prompt to avoid displaying '\
+        help='Optional. Wait for the prompt to avoid displaying '
         'password and writing it in your terminal history'
     )
 
@@ -80,11 +82,12 @@ def get_parser(parser=None):
 
     return parser
 
+
 def _get_args():
     parser = get_parser()
     args = parser.parse_args()
     return args
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     AuthClient().run()

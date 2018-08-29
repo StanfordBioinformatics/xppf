@@ -4,9 +4,10 @@ import argparse
 from getpass import getpass
 from requests.exceptions import HTTPError
 from loomengine.common import verify_server_is_running, get_server_url, \
-verify_has_connection_settings, get_token
+    verify_has_connection_settings, get_token
 from loomengine_utils.connection import Connection
 from loomengine_utils.exceptions import LoomengineUtilsError
+
 
 class AbstractUserSubcommand(object):
     def __init__(self, args, silent=False):
@@ -22,6 +23,7 @@ class AbstractUserSubcommand(object):
         if not self.silent:
             print text
 
+
 class UserAdd(AbstractUserSubcommand):
 
     @classmethod
@@ -30,9 +32,9 @@ class UserAdd(AbstractUserSubcommand):
             'username',
             metavar='USERNAME', help='add a new user')
         parser.add_argument(
-        '-p', '--password',
+            '-p', '--password',
             metavar='PASSWORD',
-            help='Optional. Wait for the prompt to avoid displaying '\
+            help='Optional. Wait for the prompt to avoid displaying '
             'password and writing it in your terminal history')
         parser.add_argument('-a', '--admin', action='store_true',
                             default=False,
@@ -56,6 +58,7 @@ class UserAdd(AbstractUserSubcommand):
             text += ' as admin'
         self._print(text)
 
+
 class UserDelete(AbstractUserSubcommand):
 
     @classmethod
@@ -67,7 +70,8 @@ class UserDelete(AbstractUserSubcommand):
 
     def run(self):
         try:
-            users = self.connection.get_user_index(query_string=self.args.username)
+            users = self.connection.get_user_index(
+                query_string=self.args.username)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to get user list: '%s'" % e)
         if len(users) == 0:
@@ -95,7 +99,8 @@ class UserList(AbstractUserSubcommand):
 
     def run(self):
         try:
-            users = self.connection.get_user_index(query_string=self.args.username)
+            users = self.connection.get_user_index(
+                query_string=self.args.username)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to get user list: '%s'" % e)
         for user in users:
@@ -103,6 +108,7 @@ class UserList(AbstractUserSubcommand):
             if user.get('is_staff'):
                 text += ' (admin)'
             self._print(text)
+
 
 class UserGrantAdmin(AbstractUserSubcommand):
 
@@ -116,7 +122,8 @@ class UserGrantAdmin(AbstractUserSubcommand):
 
     def run(self):
         try:
-            users = self.connection.get_user_index(query_string=self.args.username)
+            users = self.connection.get_user_index(
+                query_string=self.args.username)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to get user list: '%s'" % e)
         if len(users) == 0:
@@ -143,7 +150,8 @@ class UserRevokeAdmin(AbstractUserSubcommand):
 
     def run(self):
         try:
-            users = self.connection.get_user_index(query_string=self.args.username)
+            users = self.connection.get_user_index(
+                query_string=self.args.username)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to get user list: '%s'" % e)
         if len(users) == 0:
@@ -169,7 +177,7 @@ class UserSetPassword(AbstractUserSubcommand):
         parser.add_argument(
             '-p', '--password',
             metavar='PASSWORD',
-            help='Optional. Wait for the prompt to avoid displaying '\
+            help='Optional. Wait for the prompt to avoid displaying '
             'password and writing it in your terminal history')
 
         return parser
@@ -179,7 +187,8 @@ class UserSetPassword(AbstractUserSubcommand):
         if password is None:
             password = getpass("Password: ")
         try:
-            users = self.connection.get_user_index(query_string=self.args.username)
+            users = self.connection.get_user_index(
+                query_string=self.args.username)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to get user list: '%s'" % e)
         if len(users) == 0:
@@ -254,8 +263,9 @@ class UserClient(object):
         return parser
 
     def run(self):
-        return self.args.SubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = UserClient().run()

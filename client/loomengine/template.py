@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import argparse
 import glob
 import os
@@ -32,9 +31,11 @@ class AbstractTemplateSubcommand(object):
         try:
             self.storage_settings = self.connection.get_storage_settings()
             self.import_manager = ImportManager(
-                self.connection, storage_settings=self.storage_settings, silent=silent)
+                self.connection,
+                storage_settings=self.storage_settings, silent=silent)
             self.export_manager = ExportManager(
-                self.connection, storage_settings=self.storage_settings, silent=silent)
+                self.connection,
+                storage_settings=self.storage_settings, silent=silent)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to initialize client: '%s'" % e)
 
@@ -49,8 +50,8 @@ class TemplateImport(AbstractTemplateSubcommand):
     def get_parser(cls, parser):
         parser.add_argument(
             'template',
-            metavar='TEMPLATE_FILE', help='template to be imported, '\
-            'in YAML format',
+            metavar='TEMPLATE_FILE',
+            help='template to be imported, in YAML format',
             nargs='+')
         parser.add_argument(
             '-c', '--comments',
@@ -59,11 +60,11 @@ class TemplateImport(AbstractTemplateSubcommand):
         parser.add_argument(
             '-k', '--link-files', action='store_true',
             default=False,
-            help='link to existing files instead of copying to storage '\
+            help='link to existing files instead of copying to storage '
             'managed by Loom')
         parser.add_argument('-f', '--force-duplicates', action='store_true',
                             default=False,
-                            help='force upload even if another template with '\
+                            help='force upload even if another template with '
                             'the same name and md5 exists')
         parser.add_argument('-r', '--retry', action='store_true',
                             default=False,
@@ -78,7 +79,8 @@ class TemplateImport(AbstractTemplateSubcommand):
         imported_templates = []
         try:
             for template_file in FileSet(
-                    self.args.template, self.storage_settings, retry=self.args.retry):
+                    self.args.template, self.storage_settings,
+                    retry=self.args.retry):
                 try:
                     template = self.import_manager.import_template(
                         template_file,
@@ -87,7 +89,8 @@ class TemplateImport(AbstractTemplateSubcommand):
                         retry=self.args.retry,
                         link_files=self.args.link_files)
                 except LoomengineUtilsError as e:
-                    raise SystemExit("ERROR! Failed to import template: '%s'" % e)
+                    raise SystemExit(
+                        "ERROR! Failed to import template: '%s'" % e)
                 self._apply_tags(template)
                 self._apply_labels(template)
                 imported_templates.append(template)
@@ -105,7 +108,7 @@ class TemplateImport(AbstractTemplateSubcommand):
                     template.get('uuid'), tag_data)
             except LoomengineUtilsError as e:
                 raise SystemExit("ERROR! Failed to create tag: '%s'" % e)
-            self._print('Template "%s@%s" has been tagged as "%s"' % \
+            self._print('Template "%s@%s" has been tagged as "%s"' %
                         (template.get('name'),
                          template.get('uuid'),
                          tag.get('tag')))
@@ -120,7 +123,7 @@ class TemplateImport(AbstractTemplateSubcommand):
                     template.get('uuid'), label_data)
             except LoomengineUtilsError as e:
                 raise SystemExit("ERROR! Failed to create label: '%s'" % e)
-            self._print('Template "%s@%s" has been labeled as "%s"' % \
+            self._print('Template "%s@%s" has been labeled as "%s"' %
                         (template.get('name'),
                          template.get('uuid'),
                          label.get('label')))
@@ -141,12 +144,13 @@ class TemplateExport(AbstractTemplateSubcommand):
         parser.add_argument(
             '-e', '--editable', action='store_true',
             default=False,
-            help='exclude uuids so that you can edit the template '\
+            help='exclude uuids so that you can edit the template '
             'and import a new version')
         parser.add_argument(
             '-k', '--link-files', action='store_true',
             default=False,
-            help='do not export files, just metadata with link to original file')
+            help='do not export files, just metadata '
+            'with link to original file')
         parser.add_argument(
             '-r', '--retry', action='store_true',
             default=False,
@@ -166,7 +170,8 @@ class TemplateExport(AbstractTemplateSubcommand):
                         limit=limit, offset=offset,
                         query_string=template_id)
                 except LoomengineUtilsError as e:
-                    raise SystemExit("ERROR! Failed to get template list: '%s'" % e)
+                    raise SystemExit(
+                        "ERROR! Failed to get template list: '%s'" % e)
                 for template in data['results']:
                     found_at_least_one_match = True
                     if template.get('uuid') not in template_uuids:
@@ -177,7 +182,8 @@ class TemplateExport(AbstractTemplateSubcommand):
                 else:
                     break
             if not found_at_least_one_match:
-                raise SystemExit('ERROR! No templates matched "%s"' % template_id)
+                raise SystemExit(
+                    'ERROR! No templates matched "%s"' % template_id)
         if len(templates) > 1:
             try:
                 return self.export_manager.bulk_export_templates(
@@ -218,7 +224,7 @@ class TemplateList(AbstractTemplateSubcommand):
         parser.add_argument(
             '-a', '--all',
             action='store_true',
-            help='List all templates, including nested children. '\
+            help='List all templates, including nested children. '
             '(ignored when TEMPLATE_IDENTIFIER is given)')
         parser.add_argument('-l', '--label', metavar='LABEL', action='append',
                             help='Filter by label')
@@ -229,8 +235,8 @@ class TemplateList(AbstractTemplateSubcommand):
             parent_only = False
         else:
             parent_only = not self.args.all
-        offset=0
-        limit=10
+        offset = 0
+        limit = 10
         while True:
             try:
                 data = self.connection.get_template_index_with_limit(
@@ -239,7 +245,8 @@ class TemplateList(AbstractTemplateSubcommand):
                     query_string=self.args.template_id,
                     parent_only=parent_only)
             except LoomengineUtilsError as e:
-                raise SystemExit("ERROR! Failed to get template list: '%s'" % e)
+                raise SystemExit(
+                    "ERROR! Failed to get template list: '%s'" % e)
             if offset == 0:
                 self._print('[showing %s templates]' % data.get('count'))
             self._list_templates(data['results'])
@@ -279,11 +286,12 @@ class TemplateList(AbstractTemplateSubcommand):
             text = 'Template: %s' % template_identifier
         return text
 
+
 class TemplateDelete(AbstractTemplateSubcommand):
 
     @classmethod
     def get_parser(cls, parser):
-	parser.add_argument(
+        parser.add_argument(
             'template_id',
             metavar='TEMPLATE_IDENTIFIER',
             help='Name or ID of template to delete.')
@@ -298,7 +306,7 @@ class TemplateDelete(AbstractTemplateSubcommand):
     def run(self):
         try:
             data = self.connection.get_template_index(
-                query_string = self.args.template_id,
+                query_string=self.args.template_id,
                 min=1, max=1)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to get template list: '%s'" % e)
@@ -321,10 +329,10 @@ class TemplateDelete(AbstractTemplateSubcommand):
                     raise SystemExit("ERROR! Failed to get template: '%s'" % e)
         if not self.args.yes:
             user_input = raw_input(
-                'Do you really want to permanently delete template "%s"?\n'\
+                'Do you really want to permanently delete template "%s"?\n'
                 '(y)es, (n)o: '
                 % template_id)
-	    if user_input.lower() == 'n':
+            if user_input.lower() == 'n':
                 raise SystemExit('Operation canceled by user')
             elif user_input.lower() == 'y':
                 pass
@@ -334,13 +342,15 @@ class TemplateDelete(AbstractTemplateSubcommand):
             dependencies = self.connection.get_template_dependencies(
                 template.get('uuid'))
         except LoomengineUtilsError as e:
-            raise SystemExit("ERROR! Failed to get template dependencies: '%s'" % e)
-        if len(dependencies['runs']) == 0 and len(dependencies['templates']) == 0:
+            raise SystemExit(
+                "ERROR! Failed to get template dependencies: '%s'" % e)
+        if len(dependencies['runs']) == 0 \
+           and len(dependencies['templates']) == 0:
             try:
                 self.connection.delete_template(template.get('uuid'))
             except LoomengineUtilsError as e:
                 raise SystemExit("ERROR! Failed to delete template: '%s'" % e)
-	    self._print("Deleted template %s" % template_id)
+            self._print("Deleted template %s" % template_id)
         else:
             print "Cannot delete template %s because it is still in use. "\
                 "You must delete the following objects "\
@@ -365,7 +375,6 @@ class Template(object):
     """
 
     def __init__(self, args=None, silent=False):
-        
         # Args may be given as an input argument for testing purposes.
         # Otherwise get them from the parser.
         if args is None:
@@ -390,13 +399,15 @@ class Template(object):
         list_subparser = subparsers.add_parser(
             'list', help='list templates')
         TemplateList.get_parser(list_subparser)
-	list_subparser.set_defaults(SubSubcommandClass=TemplateList)
+        list_subparser.set_defaults(SubSubcommandClass=TemplateList)
 
-        tag_subparser = subparsers.add_parser('tag', help='manage template tags')
+        tag_subparser = subparsers.add_parser(
+            'tag', help='manage template tags')
         TemplateTag.get_parser(tag_subparser)
         tag_subparser.set_defaults(SubSubcommandClass=TemplateTag)
 
-        label_subparser = subparsers.add_parser('label', help='manage template labels')
+        label_subparser = subparsers.add_parser(
+            'label', help='manage template labels')
         TemplateLabel.get_parser(label_subparser)
         label_subparser.set_defaults(SubSubcommandClass=TemplateLabel)
 
@@ -414,12 +425,13 @@ class Template(object):
             'delete', help='delete template')
         TemplateDelete.get_parser(delete_subparser)
         delete_subparser.set_defaults(SubSubcommandClass=TemplateDelete)
-        
+
         return parser
 
     def run(self):
-        return self.args.SubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = Template().run()

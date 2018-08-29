@@ -1,12 +1,7 @@
 #!/usr/bin/env python
+import argparse
 import os
 import sys
-
-if __name__ == "__main__" and __package__ is None:
-    rootdir=os.path.abspath('../..')
-    sys.path.append(rootdir)
-
-import argparse
 
 from loomengine import server
 from loomengine.common import verify_has_connection_settings, \
@@ -72,6 +67,7 @@ class RunLabelAdd(object):
                  runs[0].get('uuid'),
                  label.get('label'))
 
+
 class RunLabelRemove(object):
     """Remove a run label
     """
@@ -115,7 +111,8 @@ class RunLabelRemove(object):
             raise SystemExit("ERROR! Failed to get run list: '%s'" % e)
         label_data = {'label': self.args.label}
         try:
-            label = self.connection.remove_run_label(runs[0]['uuid'], label_data)
+            label = self.connection.remove_run_label(
+                runs[0]['uuid'], label_data)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to remove label: '%s'" % e)
         if not self.silent:
@@ -200,7 +197,7 @@ class RunLabel(object):
 
     def _get_args(self):
         parser = self.get_parser()
-	return parser.parse_args()
+        return parser.parse_args()
 
     @classmethod
     def get_parser(cls, parser=None):
@@ -210,7 +207,7 @@ class RunLabel(object):
         if parser is None:
             parser = argparse.ArgumentParser(__file__)
 
-	subparsers = parser.add_subparsers()
+        subparsers = parser.add_subparsers()
 
         add_subparser = subparsers.add_parser(
             'add', help='add a run label')
@@ -230,8 +227,9 @@ class RunLabel(object):
         return parser
 
     def run(self):
-        return self.args.SubSubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = RunLabel().run()

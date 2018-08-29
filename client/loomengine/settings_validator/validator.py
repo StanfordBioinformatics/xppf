@@ -2,7 +2,8 @@ import os
 import re
 import warnings
 
-from . import to_bool
+from loomengine import to_bool
+
 
 class SettingsValidationError(Exception):
     pass
@@ -35,7 +36,7 @@ class SettingsValidator(object):
         'LOOM_ADMIN_USERNAME',
         'LOOM_ADMIN_PASSWORD',
         'LOOM_ANSIBLE_HOST_KEY_CHECKING',
-        'ANSIBLE_HOST_KEY_CHECKING', # copy of LOOM_ANSIBLE_HOST_KEY_CHECKING
+        'ANSIBLE_HOST_KEY_CHECKING',  # copy of LOOM_ANSIBLE_HOST_KEY_CHECKING
         'LOOM_DEFAULT_DOCKER_REGISTRY',
         'LOOM_STORAGE_ROOT',
         'LOOM_INTERNAL_STORAGE_ROOT',
@@ -155,8 +156,9 @@ class SettingsValidator(object):
 
     def validate(self):
         for setting in self.settings:
-            if not setting in self.KNOWN_SETTINGS:
-                warnings.warn('Unrecognized setting "%s" will be ignored' % setting)
+            if setting not in self.KNOWN_SETTINGS:
+                warnings.warn(
+                    'Unrecognized setting "%s" will be ignored' % setting)
 
         self._validate_ssl_cert_settings()
         self._validate_server_name()
@@ -173,22 +175,23 @@ class SettingsValidator(object):
         if not to_bool(self.settings.get('LOOM_SSL_CERT_CREATE_NEW')) \
            and to_bool(self.settings.get('LOOM_HTTPS_PORT_ENABLED')):
             for setting in ['LOOM_SSL_CERT_KEY_FILE',
-	                    'LOOM_SSL_CERT_FILE'
-            ]:
-                if not setting in self.settings.keys():
-                    self.errors.append('Missing setting "%s" required when '\
-                                       'LOOM_SSL_CERT_CREATE_NEW=false and '\
-                                       'LOOM_HTTPS_PORT_ENABLED=true' % setting)
+                            'LOOM_SSL_CERT_FILE']:
+                if setting not in self.settings.keys():
+                    self.errors.append(
+                        'Missing setting "%s" required when '
+                        'LOOM_SSL_CERT_CREATE_NEW=false and '
+                        'LOOM_HTTPS_PORT_ENABLED=true' % setting)
 
     def _validate_server_name(self):
-        max_len = int(self.settings.get('LOOM_GCLOUD_INSTANCE_NAME_MAX_LENGTH', 63))
+        max_len = int(self.settings.get(
+            'LOOM_GCLOUD_INSTANCE_NAME_MAX_LENGTH', 63))
         server_name = self.settings.get('LOOM_SERVER_NAME')
-        pattern='^[a-z]([-a-z0-9]*[a-z0-9])?$'
+        pattern = '^[a-z]([-a-z0-9]*[a-z0-9])?$'
         if not re.match(pattern, server_name):
             self.errors.append(
                 'Invalid LOOM_SERVER_NAME "%s". Must start with a letter, '
-                'contain only alphanumerics and hyphens, and cannot end with a '
-                'hyphen' % server_name)
+                'contain only alphanumerics and hyphens, and cannot end '
+                'with a hyphen' % server_name)
         if len(server_name) > max_len:
             self.errors.append(
                 'Invalid LOOM_SERVER_NAME "%s". Cannot exceed %s letters.'
@@ -198,7 +201,7 @@ class SettingsValidator(object):
         LOOM_STORAGE_ROOT = self.settings.get('LOOM_STORAGE_ROOT')
         if LOOM_STORAGE_ROOT and not os.path.isabs(LOOM_STORAGE_ROOT):
             self.errors.append(
-                'Invalid value "%s" for setting LOOM_STORAGE_ROOT. '\
+                'Invalid value "%s" for setting LOOM_STORAGE_ROOT. '
                 'Value must be an absolute path.' % LOOM_STORAGE_ROOT)
 
     def _validate_gcloud_settings(self):
@@ -208,41 +211,41 @@ class SettingsValidator(object):
                 'LOOM_GCE_PEM_FILE',
                 'LOOM_GCE_EMAIL',
                 'LOOM_GCE_PROJECT',
-                'LOOM_GOOGLE_STORAGE_BUCKET',
-        ]:
-            if not required_setting in self.settings.keys():
+                'LOOM_GOOGLE_STORAGE_BUCKET']:
+            if required_setting not in self.settings.keys():
                 self.errors.append(
-                    'Missing setting "%s" is required when '\
+                    'Missing setting "%s" is required when '
                     'LOOM_MODE="gcloud"' % required_setting)
             if self.settings.get('LOOM_STORAGE_TYPE').lower() == 'local':
                 self.errors.append(
-                    'Setting LOOM_STORAGE_TYPE=local not allowed '\
+                    'Setting LOOM_STORAGE_TYPE=local not allowed '
                     'when LOOM_MODE==gcloud.')
         if self.settings.get('LOOM_GCLOUD_WORKER_EXTERNAL_IP'):
             ip = self.settings.get('LOOM_GCLOUD_WORKER_EXTERNAL_IP')
-            if not ip in ['none', 'ephemeral']:
+            if ip not in ['none', 'ephemeral']:
                 self.errors.append(
-                    'Invalid value "%s" for LOOM_GCLOUD_WORKER_EXTERNAL_IP. '\
-                    'Allowed values are "ephemeral" and "none". If you need to restrict '
-                    'the IP address range, use a subnetwork.' % ip)
+                    'Invalid value "%s" for LOOM_GCLOUD_WORKER_EXTERNAL_IP. '
+                    'Allowed values are "ephemeral" and "none". If you need '
+                    'to restrict the IP address range, use a subnetwork.' % ip)
 
     def _validate_auth_settings(self):
         if to_bool(self.settings.get('LOOM_LOGIN_REQUIRED')):
             for required_setting in [
                     'LOOM_ADMIN_USERNAME',
                     'LOOM_ADMIN_PASSWORD']:
-                if not required_setting in self.settings.keys():
+                if required_setting not in self.settings.keys():
                     self.errors.append(
-                        'Missing setting "%s" is required when '\
+                        'Missing setting "%s" is required when '
                         'LOOM_LOGIN_REQUIRED=true' % required_setting)
 
-            username_regex = '^[a-zA-Z0-8@\+\.\-]{1,150}$'
+            username_regex = r'^[a-zA-Z0-8@\+\.\-]{1,150}$'
             username = self.settings.get('LOOM_ADMIN_USERNAME')
             if username and not re.match(username_regex, username):
                 self.errors.append(
-                    'Invalid LOOM_ADMIN_USERNAME "%s". Must match regex %s.' % (
+                    'Invalid LOOM_ADMIN_USERNAME "%s". '
+                    'Must match regex %s.' % (
                         username, username_regex))
             if not to_bool(self.settings.get('LOOM_HTTPS_PORT_ENABLED')):
                 self.errors.append(
-                    'If LOOM_LOGIN_REQUIRED is true, you must set '\
+                    'If LOOM_LOGIN_REQUIRED is true, you must set '
                     'LOOM_HTTPS_PORT_ENABLED=true')

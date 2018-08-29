@@ -20,7 +20,8 @@ class SmokeTest(unittest.TestCase):
         self.run_tag = 'smoke-test-%s' % uuid.uuid4()
         self.tempdir = tempfile.mkdtemp()
         parser = loomengine.example.Example.get_parser()
-        args = parser.parse_args(['export', self.template_name, '-d', self.tempdir])
+        args = parser.parse_args(
+            ['export', self.template_name, '-d', self.tempdir])
         example_export_client = loomengine.example.Example(args, silent=True)
         example_export_client.run()
         self.template_path = os.path.join(
@@ -58,7 +59,8 @@ class SmokeTest(unittest.TestCase):
         parser = loomengine.template.Template.get_parser()
         args = parser.parse_args(['import', self.template_path,
                                   '-f', '-r', '-t', self.template_tag])
-        template_import_client = loomengine.template.Template(args, silent=True)
+        template_import_client = loomengine.template.Template(
+            args, silent=True)
         template_import_client.run()
 
         args = parser.parse_args(['list', ':%s' % self.template_tag])
@@ -96,13 +98,15 @@ class SmokeTest(unittest.TestCase):
             else:
                 raise Exception(error_message)
 
-    def _poll_for_run_success(self, client, timeout_seconds=1800, sleep_seconds=20,
-                    error_message='ERROR! Timed out'):
+    def _poll_for_run_success(
+            self, client, timeout_seconds=1800, sleep_seconds=20,
+            error_message='ERROR! Timed out'):
         start = datetime.now()
         while True:
             try:
                 result = client.run()
-                assert len(result)==1, 'Expected 1 run, found %s' % len(result)
+                assert len(result) == 1, \
+                    'Expected 1 run, found %s' % len(result)
                 if result[0].get('status') == 'Finished':
                     return result[0]
                 elif result[0].get('status') == 'Failed':
@@ -112,7 +116,8 @@ class SmokeTest(unittest.TestCase):
                 elif result[0].get('status') == 'Running':
                     pass
                 elif result[0].get('status') != 'Waiting':
-                    raise Exception('Unknown run status "%s"' % result[0].get('status'))
+                    raise Exception(
+                        'Unknown run status "%s"' % result[0].get('status'))
             except SystemExit:
                 pass
             if (datetime.now() - start).total_seconds() < timeout_seconds:
@@ -122,5 +127,5 @@ class SmokeTest(unittest.TestCase):
                 raise Exception(error_message)
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     unittest.main()

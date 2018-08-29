@@ -1,18 +1,14 @@
 #!/usr/bin/env python
+import argparse
 import os
 import sys
-
-if __name__ == "__main__" and __package__ is None:
-    rootdir=os.path.abspath('../..')
-    sys.path.append(rootdir)
-
-import argparse
 
 from loomengine import server
 from loomengine.common import verify_has_connection_settings, \
     get_server_url, verify_server_is_running, get_token
 from loomengine_utils.connection import Connection
 from loomengine_utils.exceptions import LoomengineUtilsError
+
 
 class FileLabelAdd(object):
     """Add a new file labels
@@ -61,7 +57,8 @@ class FileLabelAdd(object):
             raise SystemExit("ERROR! Failed to get data object list: '%s'" % e)
         label_data = {'label': self.args.label}
         try:
-            label = self.connection.post_data_label(files[0]['uuid'], label_data)
+            label = self.connection.post_data_label(
+                files[0]['uuid'], label_data)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to create label: '%s'" % e)
         if not self.silent:
@@ -69,6 +66,7 @@ class FileLabelAdd(object):
                 (files[0]['value'].get('filename'),
                  files[0].get('uuid'),
                  label.get('label'))
+
 
 class FileLabelRemove(object):
     """Remove a file label
@@ -113,7 +111,8 @@ class FileLabelRemove(object):
             raise SystemExit("ERROR! Failed to get data object list: '%s'" % e)
         label_data = {'label': self.args.label}
         try:
-            label = self.connection.remove_data_label(files[0]['uuid'], label_data)
+            label = self.connection.remove_data_label(
+                files[0]['uuid'], label_data)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to remove label: '%s'" % e)
         if not self.silent:
@@ -161,7 +160,8 @@ class FileLabelList(object):
                     min=1, max=1,
                     query_string=self.args.target, type='file')
             except LoomengineUtilsError as e:
-                raise SystemExit("ERROR! Failed to get data object list: '%s'" % e)
+                raise SystemExit(
+                    "ERROR! Failed to get data object list: '%s'" % e)
             try:
                 label_data = self.connection.list_data_labels(files[0]['uuid'])
             except LoomengineUtilsError as e:
@@ -198,7 +198,7 @@ class FileLabel(object):
 
     def _get_args(self):
         parser = self.get_parser()
-	return parser.parse_args()
+        return parser.parse_args()
 
     @classmethod
     def get_parser(cls, parser=None):
@@ -208,7 +208,7 @@ class FileLabel(object):
         if parser is None:
             parser = argparse.ArgumentParser(__file__)
 
-	subparsers = parser.add_subparsers()
+        subparsers = parser.add_subparsers()
 
         add_subparser = subparsers.add_parser(
             'add', help='add a file label')
@@ -228,8 +228,9 @@ class FileLabel(object):
         return parser
 
     def run(self):
-        return self.args.SubSubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = FileLabel().run()

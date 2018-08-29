@@ -17,12 +17,14 @@ class DelimitedParser(object):
             text_array = [item.strip() for item in text_array]
         return text_array
 
+
 def _get_parser_info(output):
     assert output.get('parser'), 'invalid output: "parser" is missing'
     parser_type = output['parser'].get('type')
     assert parser_type == 'delimited', 'invalid parser type "%s"' % parser_type
     options = output['parser'].get('options', {})
     return (parser_type, options)
+
 
 def OutputParser(output):
     (parser_type, options) = _get_parser_info(output)

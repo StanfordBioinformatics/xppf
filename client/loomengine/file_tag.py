@@ -1,12 +1,7 @@
 #!/usr/bin/env python
+import argparse
 import os
 import sys
-
-if __name__ == "__main__" and __package__ is None:
-    rootdir=os.path.abspath('../..')
-    sys.path.append(rootdir)
-
-import argparse
 
 from loomengine import server
 from loomengine.common import verify_has_connection_settings, \
@@ -20,7 +15,6 @@ class FileTagAdd(object):
     """
 
     def __init__(self, args=None, silent=False):
-
         # Args may be given as an input argument for testing purposes
         # or from the main parser.
         # Otherwise get them from the parser.
@@ -71,6 +65,7 @@ class FileTagAdd(object):
                 (files[0]['value'].get('filename'),
                  files[0].get('uuid'),
                  tag.get('tag'))
+
 
 class FileTagRemove(object):
     """Remove a file tag
@@ -162,7 +157,8 @@ class FileTagList(object):
                     min=1, max=1,
                     query_string=self.args.target, type='file')
             except LoomengineUtilsError as e:
-                raise SystemExit("ERROR! Failed to get data object list: '%s'" % e)
+                raise SystemExit(
+                    "ERROR! Failed to get data object list: '%s'" % e)
 
             try:
                 tag_data = self.connection.list_data_tags(files[0]['uuid'])
@@ -193,7 +189,7 @@ class FileTag(object):
 
     def _get_args(self):
         parser = self.get_parser()
-	return parser.parse_args()
+        return parser.parse_args()
 
     @classmethod
     def get_parser(cls, parser=None):
@@ -203,7 +199,7 @@ class FileTag(object):
         if parser is None:
             parser = argparse.ArgumentParser(__file__)
 
-	subparsers = parser.add_subparsers()
+        subparsers = parser.add_subparsers()
 
         add_subparser = subparsers.add_parser(
             'add', help='add a file tag')
@@ -223,8 +219,9 @@ class FileTag(object):
         return parser
 
     def run(self):
-        return self.args.SubSubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = FileTag().run()

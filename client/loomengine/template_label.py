@@ -1,12 +1,7 @@
 #!/usr/bin/env python
+import argparse
 import os
 import sys
-
-if __name__ == "__main__" and __package__ is None:
-    rootdir=os.path.abspath('../..')
-    sys.path.append(rootdir)
-
-import argparse
 
 from loomengine import server
 from loomengine.common import verify_has_connection_settings, \
@@ -71,6 +66,7 @@ class TemplateLabelAdd(object):
                 (templates[0].get('name'),
                  templates[0].get('uuid'),
                  label.get('label'))
+
 
 class TemplateLabelRemove(object):
     """Remove a template label
@@ -164,7 +160,8 @@ class TemplateLabelList(object):
                     min=1, max=1,
                     query_string=self.args.target)
             except LoomengineUtilsError as e:
-                raise SystemExit("ERROR! Failed to get template list: '%s'" % e)
+                raise SystemExit(
+                    "ERROR! Failed to get template list: '%s'" % e)
             try:
                 label_data = self.connection.list_template_labels(
                     templates[0]['uuid'])
@@ -202,7 +199,7 @@ class TemplateLabel(object):
 
     def _get_args(self):
         parser = self.get_parser()
-	return parser.parse_args()
+        return parser.parse_args()
 
     @classmethod
     def get_parser(cls, parser=None):
@@ -212,7 +209,7 @@ class TemplateLabel(object):
         if parser is None:
             parser = argparse.ArgumentParser(__file__)
 
-	subparsers = parser.add_subparsers()
+        subparsers = parser.add_subparsers()
 
         add_subparser = subparsers.add_parser(
             'add', help='add a template label')
@@ -222,7 +219,8 @@ class TemplateLabel(object):
         remove_subparser = subparsers.add_parser(
             'remove', help='remove a template label')
         TemplateLabelRemove.get_parser(remove_subparser)
-        remove_subparser.set_defaults(SubSubSubcommandClass=TemplateLabelRemove)
+        remove_subparser.set_defaults(
+            SubSubSubcommandClass=TemplateLabelRemove)
 
         list_subparser = subparsers.add_parser(
             'list', help='list template labels')
@@ -232,8 +230,9 @@ class TemplateLabel(object):
         return parser
 
     def run(self):
-        return self.args.SubSubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = TemplateLabel().run()

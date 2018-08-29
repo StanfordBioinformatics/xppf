@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import argparse
 from datetime import datetime
 import os
@@ -11,6 +10,7 @@ import unittest
 
 
 test_root = os.path.join(os.path.dirname(__file__), 'test')
+
 
 class IntegrationTestFailure(Exception):
     pass
@@ -37,18 +37,19 @@ class TestRunner(object):
 
     def smoke_test(self):
         if not self._is_server_running():
-            raise SystemExit('ERROR! The client must be connected to a '\
-                             'running Loom server to run smoke tests. '\
+            raise SystemExit('ERROR! The client must be connected to a '
+                             'running Loom server to run smoke tests. '
                              'Use "loom server start" to start a new server.')
-        suite = unittest.TestLoader().discover(test_root, pattern='smoketest*.py')
+        suite = unittest.TestLoader().discover(
+            test_root, pattern='smoketest*.py')
         test_result = unittest.TextTestRunner().run(suite)
         if not test_result.wasSuccessful():
             raise SystemExit(1)
-        
+
     def integration_test(self):
         if not self._is_server_running():
-            raise SystemExit('ERROR! The client must be connected to a '\
-                             'running Loom server to run integration tests. '\
+            raise SystemExit('ERROR! The client must be connected to a '
+                             'running Loom server to run integration tests. '
                              'Use "loom server start" to start a new server.')
         suite = unittest.TestLoader().discover(
             test_root, pattern='integrationtest*.py')
@@ -94,11 +95,12 @@ def get_parser(parser=None):
         help='run integration tests (requires a running Loom server)')
     return parser
 
+
 def _get_args():
     parser = get_parser()
     args = parser.parse_args()
     return args
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     TestRunner().run()

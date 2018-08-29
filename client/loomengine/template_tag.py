@@ -1,12 +1,7 @@
 #!/usr/bin/env python
+import argparse
 import os
 import sys
-
-if __name__ == "__main__" and __package__ is None:
-    rootdir=os.path.abspath('../..')
-    sys.path.append(rootdir)
-
-import argparse
 
 from loomengine import server
 from loomengine.common import verify_has_connection_settings, \
@@ -62,13 +57,15 @@ class TemplateTagAdd(object):
             raise SystemExit("ERROR! Failed to get template list: '%s'" % e)
         tag_data = {'tag': self.args.tag}
         try:
-            tag = self.connection.post_template_tag(templates[0]['uuid'], tag_data)
+            tag = self.connection.post_template_tag(
+                templates[0]['uuid'], tag_data)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to create tag: '%s'" % e)
         print 'Target "%s@%s" has been tagged as "%s"' % \
             (templates[0].get('name'),
              templates[0].get('uuid'),
              tag.get('tag'))
+
 
 class TemplateTagRemove(object):
     """Remove a template tag
@@ -113,7 +110,8 @@ class TemplateTagRemove(object):
             raise SystemExit("ERROR! Failed to get template list: '%s'" % e)
         tag_data = {'tag': self.args.tag}
         try:
-            tag = self.connection.remove_template_tag(templates[0]['uuid'], tag_data)
+            tag = self.connection.remove_template_tag(
+                templates[0]['uuid'], tag_data)
         except LoomengineUtilsError as e:
             raise SystemExit("ERROR! Failed to remove tag: '%s'" % e)
         print 'Tag %s has been removed from template "%s@%s"' % \
@@ -160,9 +158,11 @@ class TemplateTagList(object):
                     min=1, max=1,
                     query_string=self.args.target)
             except LoomengineUtilsError as e:
-                raise SystemExit("ERROR! Failed to get template list: '%s'" % e)
+                raise SystemExit(
+                    "ERROR! Failed to get template list: '%s'" % e)
             try:
-                tag_data = self.connection.list_template_tags(templates[0]['uuid'])
+                tag_data = self.connection.list_template_tags(
+                    templates[0]['uuid'])
             except LoomengineUtilsError as e:
                 raise SystemExit("ERROR! Failed to get tag list: '%s'" % e)
             tags = tag_data.get('tags', [])
@@ -189,7 +189,7 @@ class TemplateTag(object):
 
     def _get_args(self):
         parser = self.get_parser()
-	return parser.parse_args()
+        return parser.parse_args()
 
     @classmethod
     def get_parser(cls, parser=None):
@@ -199,7 +199,7 @@ class TemplateTag(object):
         if parser is None:
             parser = argparse.ArgumentParser(__file__)
 
-	subparsers = parser.add_subparsers()
+        subparsers = parser.add_subparsers()
 
         add_subparser = subparsers.add_parser(
             'add', help='add a template tag')
@@ -219,8 +219,9 @@ class TemplateTag(object):
         return parser
 
     def run(self):
-        return self.args.SubSubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = TemplateTag().run()

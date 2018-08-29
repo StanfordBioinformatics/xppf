@@ -1,14 +1,9 @@
 #!/usr/bin/env python
-import webbrowser
+import argparse
 import os
 import sys
+import webbrowser
 
-if __name__ == "__main__" and __package__ is None:
-    rootdir=os.path.abspath('../..')
-    sys.path.append(rootdir)
-
-import argparse
-    
 from loomengine import server
 from loomengine.common import verify_has_connection_settings, get_server_url, \
     verify_server_is_running
@@ -25,7 +20,7 @@ class Browser(object):
         if args is None:
             args = self._get_args()
         self.args = args
-        self.silent=silent
+        self.silent = silent
         verify_has_connection_settings()
         self.server_url = get_server_url()
         verify_server_is_running(url=self.server_url)
@@ -47,9 +42,10 @@ class Browser(object):
         try:
             webbrowser.open(self.server_url)
         except webbrowser.Error:
-            raise SystemExit('ERROR! Unable to open browser. '\
-                             'Please manually launch a browser and '\
+            raise SystemExit('ERROR! Unable to open browser. '
+                             'Please manually launch a browser and '
                              'navitage to this url: "%s".' % self.server_url)
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     response = Browser().run()

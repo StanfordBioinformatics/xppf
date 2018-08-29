@@ -42,7 +42,7 @@ class TaskMonitor(object):
             'SERVER_URL': args.server_url,
             'LOG_LEVEL': args.log_level,
         }
-        self.is_failed=False
+        self.is_failed = False
 
         self.logger = get_stdout_logger(
             __name__, self.settings['LOG_LEVEL'])
@@ -56,8 +56,8 @@ class TaskMonitor(object):
             except Exception as e:
                 error = self._get_error_text(e)
                 self.logger.error(
-                    'TaskMonitor for attempt %s failed to initialize server '\
-                    'connection. %s' \
+                    'TaskMonitor for attempt %s failed to initialize server '
+                    'connection. %s'
                     % (self.settings.get('TASK_ATTEMPT_ID'), error))
                 raise
 
@@ -81,7 +81,7 @@ class TaskMonitor(object):
             except Exception as e:
                 error = self._get_error_text(e)
                 self._report_system_error(
-                    detail='Initializing TaskMonitor failed. %s'\
+                    detail='Initializing TaskMonitor failed. %s'
                     % error)
                 raise
 
@@ -90,7 +90,8 @@ class TaskMonitor(object):
             self.settings['TASK_ATTEMPT_ID'])
         if self.task_attempt is None:
             raise Exception(
-                'TaskAttempt ID "%s" not found' % self.settings['TASK_ATTEMPT_ID'])
+                'TaskAttempt ID "%s" not found'
+                % self.settings['TASK_ATTEMPT_ID'])
 
     def _get_settings(self):
         settings = self.connection.get_task_attempt_settings(
@@ -111,10 +112,11 @@ class TaskMonitor(object):
 
     def _init_working_dir(self):
         init_directory(self.settings['WORKING_DIR_ROOT'], new=True)
-        self.working_dir = os.path.join(self.settings['WORKING_DIR_ROOT'], 'work')
+        self.working_dir = os.path.join(
+            self.settings['WORKING_DIR_ROOT'], 'work')
         self.log_dir = os.path.join(self.settings['WORKING_DIR_ROOT'], 'logs')
         init_directory(self.working_dir, new=True)
-        init_directory(self.log_dir, new=True)    
+        init_directory(self.log_dir, new=True)
 
     def _delete_working_dir(self):
         # Skip delete if blank or root!
@@ -164,12 +166,13 @@ class TaskMonitor(object):
         except FileAlreadyExistsError as e:
             error = self._get_error_text(e)
             self._report_system_error(
-                detail='Copying inputs failed because file already exists. '\
+                detail='Copying inputs failed because file already exists. '
                 'Are there multiple inputs with the same name? %s' % error)
             raise
         except Exception as e:
             error = self._get_error_text(e)
-            self._report_system_error(detail='Copying inputs failed. %s' % error)
+            self._report_system_error(
+                detail='Copying inputs failed. %s' % error)
             raise
 
     def _create_run_script(self):
@@ -182,7 +185,8 @@ class TaskMonitor(object):
                 f.write(user_command.encode('utf-8') + '\n')
         except Exception as e:
             error = self._get_error_text(e)
-            self._report_system_error(detail='Creating run script failed. %s' % error)
+            self._report_system_error(
+                detail='Creating run script failed. %s' % error)
             raise
 
     def _pull_image(self):
@@ -203,23 +207,27 @@ class TaskMonitor(object):
             self._save_environment_info(container_info)
         except Exception as e:
             error = self._get_error_text(e)
-            self._report_system_error(detail='Pulling Docker image failed with "%s" error: "%s"' % (e.__class__, str(e)))
+            self._report_system_error(
+                detail='Pulling Docker image failed with "%s" error: '
+                '"%s"' % (e.__class__, str(e)))
             raise
 
     def _get_docker_image(self):
         docker_image = self.task_attempt['environment']['docker_image']
         # If no registry is specified, set to default.
         # If the first term contains "." or ends in ":", it is a registry.
-        part1=docker_image.split('/')[0]
-        if not '.' in part1 and not part1.endswith(':'):
-            default_registry = self.settings.get('DEFAULT_DOCKER_REGISTRY', None)
-            # Don't add default_registry without the owner. Default ower is library
+        part1 = docker_image.split('/')[0]
+        if '.' not in part1 and not part1.endswith(':'):
+            default_registry = self.settings.get(
+                'DEFAULT_DOCKER_REGISTRY', None)
+            # Don't add default_registry without the owner.
+            # Default ower is library
             if len(docker_image.split('/')) == 1:
-                   docker_image = 'library/' + docker_image
+                docker_image = 'library/' + docker_image
             if default_registry:
                 docker_image = '%s/%s' % (default_registry, docker_image)
         # Tag is required. Otherwise docker-py pull will download all tags.
-        if not '@' in docker_image and not ':' in docker_image:
+        if '@' not in docker_image and ':' not in docker_image:
             docker_image += ':latest'
         return docker_image
 
@@ -252,7 +260,8 @@ class TaskMonitor(object):
             self._set_container_id(self.container['Id'])
         except Exception as e:
             error = self._get_error_text(e)
-            self._report_system_error(detail='Creating container failed. %s' % error)
+            self._report_system_error(
+                detail='Creating container failed. %s' % error)
             raise
 
     def _run_container(self):
@@ -262,7 +271,8 @@ class TaskMonitor(object):
             self._verify_container_started_running()
         except Exception as e:
             error = self._get_error_text(e)
-            self._report_system_error(detail='Starting analysis failed. %s' % error)
+            self._report_system_error(
+                detail='Starting analysis failed. %s' % error)
             raise
 
     def _verify_container_started_running(self):
@@ -274,8 +284,8 @@ class TaskMonitor(object):
             raise Exception('Unexpected container status "%s"' % status)
 
     def _stream_docker_logs(self):
-        """Stream stdout and stderr from the task container to this process's 
-        stdout and stderr, respectively.
+        """Stream stdout and stderr from the task container to this
+        process's stdout and stderr, respectively.
         """
         thread = threading.Thread(target=self._stderr_stream_worker)
         thread.start()
@@ -298,7 +308,7 @@ class TaskMonitor(object):
             else:
                 # bad returncode
                 self._report_analysis_error(
-                    'Analysis finished with returncode %s. '\
+                    'Analysis finished with returncode %s. '
                     'Check stderr/stdout logs for errors.'
                     % returncode)
                 # Do not raise error. Attempt to save log files.
@@ -310,13 +320,16 @@ class TaskMonitor(object):
     def _poll_for_returncode(self, poll_interval_seconds=1):
         while True:
             try:
-                container_data = self.docker_client.inspect_container(self.container)
+                container_data = self.docker_client.inspect_container(
+                    self.container)
             except Exception as e:
-                raise Exception('Unable to inspect Docker container: "%s"' % str(e))
+                raise Exception(
+                    'Unable to inspect Docker container: "%s"' % str(e))
 
             if not container_data.get('State'):
                 raise Exception(
-                    'Could not parse container info from Docker: "%s"' % container_data)
+                    'Could not parse container info from Docker: "%s"'
+                    % container_data)
 
             if container_data['State'].get('Status') == 'exited':
                 # Success
@@ -344,14 +357,17 @@ class TaskMonitor(object):
             self._import_log_file(stdout_file, retry=True)
         except Exception as e:
             error = self._get_error_text(e)
-            self._report_system_error(detail='Saving log files failed. %s' % error)
+            self._report_system_error(
+                detail='Saving log files failed. %s' % error)
             raise
-            
+
     def _get_stdout(self):
-        return self.docker_client.logs(self.container, stderr=False, stdout=True)
+        return self.docker_client.logs(
+            self.container, stderr=False, stdout=True)
 
     def _get_stderr(self):
-        return self.docker_client.logs(self.container, stderr=True, stdout=False)
+        return self.docker_client.logs(
+            self.container, stderr=True, stdout=False)
 
     def _import_log_file(self, filepath, retry=True):
         try:
@@ -371,7 +387,8 @@ class TaskMonitor(object):
                 TaskAttemptOutput(output, self).save()
         except Exception as e:
             error = self._get_error_text(e)
-            self._report_system_error(detail='Saving outputs failed. %s' % error)
+            self._report_system_error(
+                detail='Saving outputs failed. %s' % error)
             raise
 
     def _finish(self):
@@ -379,9 +396,9 @@ class TaskMonitor(object):
             self._finish()
         except Exception as e:
             error = self._get_error_text(e)
-            self._report_system_error(detail='Setting finished status failed. %s' % error)
+            self._report_system_error(
+                detail='Setting finished status failed. %s' % error)
             raise
-
 
     # Updates to TaskAttempt
 
@@ -418,23 +435,25 @@ class TaskMonitor(object):
             })
 
     def _report_system_error(self, detail=''):
-        self.is_failed=True
+        self.is_failed = True
         try:
-            self._event("TaskAttempt execution failed.", detail=detail, is_error=True)
+            self._event(
+                "TaskAttempt execution failed.", detail=detail, is_error=True)
             self.connection.post_task_attempt_system_error(
                 self.settings['TASK_ATTEMPT_ID'])
-        except:
+        except Exception:
             # If there is an error reporting failure, don't raise it
             # because it will mask the root cause of failure
             pass
 
     def _report_analysis_error(self, detail=''):
-        self.is_failed=True
+        self.is_failed = True
         try:
-            self._event("TaskAttempt execution failed.", detail=detail, is_error=True)
+            self._event(
+                "TaskAttempt execution failed.", detail=detail, is_error=True)
             self.connection.post_task_attempt_analysis_error(
                 self.settings['TASK_ATTEMPT_ID'])
-        except:
+        except Exception:
             # If there is an error reporting failure, don't raise it
             # because it will mask the root cause of failure
             pass
@@ -482,7 +501,8 @@ class TaskMonitor(object):
         parser.add_argument('-l',
                             '--log_level',
                             required=False,
-                            choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                            choices=['DEBUG', 'INFO', 'WARNING',
+                                     'ERROR', 'CRITICAL'],
                             default='WARNING',
                             help='Log level')
         parser.add_argument('-t',
@@ -491,6 +511,7 @@ class TaskMonitor(object):
                             default=None,
                             help='Authentication token')
         return parser
+
 
 def init_directory(directory, new=False):
     if new and os.path.exists(directory):
@@ -503,7 +524,9 @@ def init_directory(directory, new=False):
         if not os.path.exists(directory):
             os.makedirs(directory)
     except OSError as e:
-        raise Exception('Failed to create directory %s. %s' % (directory, e.strerror))
+        raise Exception(
+            'Failed to create directory %s. %s' % (directory, e.strerror))
+
 
 LOG_LEVELS = {
     'CRITICAL': logging.CRITICAL,
@@ -512,6 +535,7 @@ LOG_LEVELS = {
     'INFO': logging.INFO,
     'DEBUG': logging.DEBUG,
 }
+
 
 def get_stdout_logger(name, log_level_string):
     log_level = LOG_LEVELS[log_level_string.upper()]
@@ -529,5 +553,5 @@ def main():
     monitor.run_with_heartbeats(monitor.run)
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main()

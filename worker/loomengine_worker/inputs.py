@@ -1,5 +1,6 @@
 import os
 
+
 class BaseInput(object):
 
     def __init__(self, data_contents, task_monitor):
@@ -28,8 +29,8 @@ class FileListInput(BaseInput):
 
         filename_counts = {}
         for data_object in data_object_list:
-	    filename = data_object['value']['filename']
-            # Increment filenames if there are duplicates in an array,       
+            filename = data_object['value']['filename']
+            # Increment filenames if there are duplicates in an array,
             # e.g. file__0__.txt, file__1__.txt, file__2__.txt
             if filename in duplicates:
                 counter = filename_counts.setdefault(filename, 0)
@@ -57,7 +58,8 @@ class FileListInput(BaseInput):
         if len(parts) == 1:
             return parts[0] + '(%s)' % counter
         else:
-            return '.'.join(parts[0:len(parts)-1]) + '__%s__.' % counter + parts[-1]
+            return '.'.join(
+                parts[0:len(parts)-1]) + '__%s__.' % counter + parts[-1]
 
 
 class NoOpInput(BaseInput):

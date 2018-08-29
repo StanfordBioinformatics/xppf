@@ -18,8 +18,9 @@ class FileOutput(BaseOutput):
     def save(self):
         filename = self.output['source']['filename']
         file_path = os.path.join(
-	    self.working_dir, filename)
-        self.import_manager.import_result_file(self.output, file_path, retry=True)
+            self.working_dir, filename)
+        self.import_manager.import_result_file(
+            self.output, file_path, retry=True)
 
 
 class FileListScatterOutput(BaseOutput):
@@ -28,7 +29,7 @@ class FileListScatterOutput(BaseOutput):
         filename_list = self.output['source']['filenames']
         file_path_list = [
             os.path.join(
-	        self.working_dir, filename)
+                self.working_dir, filename)
             for filename in filename_list]
         self.import_manager.import_result_file_list(
             self.output, file_path_list, retry=True)
@@ -40,13 +41,13 @@ class FileContentsOutput(BaseOutput):
         filename = self.output['source']['filename']
         text = self._read_file(filename)
         self.output.update({'data': {'contents': text}})
-	self.connection.update_task_attempt_output(
+        self.connection.update_task_attempt_output(
             self.output['uuid'],
             self.output)
 
     def _read_file(self, filename):
         file_path = os.path.join(
-	    self.working_dir, filename)
+            self.working_dir, filename)
         with open(file_path, 'r') as f:
             text = f.read()
         return text
@@ -60,7 +61,7 @@ class FileContentsScatterOutput(FileContentsOutput):
         text = self._read_file(filename)
         contents_list = parser.parse(text)
         self.output.update({'data': {'contents': contents_list}})
-	self.connection.update_task_attempt_output(
+        self.connection.update_task_attempt_output(
             self.output['uuid'],
             self.output)
 
@@ -74,7 +75,7 @@ class FileListContentsScatterOutput(FileContentsOutput):
         contents_list = []
         for filename in filename_list:
             file_path = os.path.join(
-	        self.working_dir, filename)
+                self.working_dir, filename)
             contents_list.append(self._read_file(file_path))
         self.output.update({'data': {'contents': contents_list}})
         self.connection.update_task_attempt_output(
@@ -92,7 +93,7 @@ class StreamOutput(BaseOutput):
         else:
             text = self._get_stderr()
         self.output.update({'data': {'contents': text}})
-	self.connection.update_task_attempt_output(
+        self.connection.update_task_attempt_output(
             self.output['uuid'],
             self.output)
 
@@ -116,7 +117,7 @@ class StreamScatterOutput(StreamOutput):
         parser = OutputParser(self.output)
         contents_list = parser.parse(text)
         self.output.update({'data': {'contents': contents_list}})
-	self.connection.update_task_attempt_output(
+        self.connection.update_task_attempt_output(
             self.output['uuid'],
             self.output)
 
@@ -125,7 +126,7 @@ class GlobScatterOutput(BaseOutput):
 
     def save(self):
         globstring = os.path.join(
-	    self.working_dir,
+            self.working_dir,
             self.output['source']['glob'])
         file_path_list = glob.glob(globstring)
         self.import_manager.import_result_file_list(
@@ -136,14 +137,14 @@ class GlobContentsScatterOutput(FileContentsOutput):
 
     def save(self):
         globstring = os.path.join(
-	    self.working_dir,
+            self.working_dir,
             self.output['source']['glob'])
         file_path_list = glob.glob(globstring)
         contents_list = []
         for file_path in file_path_list:
             contents_list.append(self._read_file(file_path))
         self.output.update({'data': {'contents': contents_list}})
-	self.connection.update_task_attempt_output(
+        self.connection.update_task_attempt_output(
             self.output['uuid'],
             self.output)
 
@@ -162,8 +163,10 @@ def _get_output_info(output):
     filename_list_source = output['source'].get('filenames')
     glob_source = output['source'].get('glob')
     stream_source = output['source'].get('stream')
-    assert sum([bool(filename_source), bool(glob_source), bool(stream_source), bool(filename_list_source)]) == 1, \
-        'exactly one type of source is required: "%s"' % output['source']
+    assert sum([bool(filename_source), bool(glob_source),
+                bool(stream_source), bool(filename_list_source)]) == 1, \
+        'exactly one type of source is required: "%s"' \
+        % output['source']
     if glob_source:
         source_type = 'glob'
     elif stream_source:
@@ -173,6 +176,7 @@ def _get_output_info(output):
     elif filename_list_source:
         source_type = 'filenames'
     return (data_type, mode, source_type)
+
 
 def TaskAttemptOutput(output, task_attempt):
     """Returns the correct Output class for a given
@@ -193,9 +197,10 @@ def TaskAttemptOutput(output, task_attempt):
             assert source_type == 'filename', \
                 'source type "%s" not allowed' % source_type
             return FileOutput(output, task_attempt)
-    else: # data_type is non-file
+    else:  # data_type is non-file
         if mode == 'scatter':
-            assert source_type in ['filename', 'filenames', 'glob', 'stream'], \
+            assert source_type in [
+                'filename', 'filenames', 'glob', 'stream'], \
                 'source type "%s" not allowed' % source_type
             if source_type == 'filename':
                 return FileContentsScatterOutput(output, task_attempt)
@@ -206,7 +211,7 @@ def TaskAttemptOutput(output, task_attempt):
             assert source_type == 'stream'
             return StreamScatterOutput(output, task_attempt)
         else:
-            assert mode=='no_scatter'
+            assert mode == 'no_scatter'
             assert source_type in ['filename', 'stream'], \
                 'source type "%s" not allowed' % source_type
             if source_type == 'filename':

@@ -17,10 +17,13 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
+
 def _get_version():
     versionpath = path.join(here, 'loomengine', 'VERSION')
     with open(versionpath) as versionfile:
         return versionfile.read().strip()
+
+
 version = _get_version()
 
 setup(
@@ -36,9 +39,6 @@ setup(
 
     # The project's main homepage.
     url='https://github.com/StanfordBioinformatics/loom',
-
-    # Could use a utility like Travis CI to automatically create pip releases from GitHub tags.
-    #download_url='https://github.com/StanfordBioinformatics/loom/tarball/'+version,
 
     # Author details
     author='Nathan Hammond, Isaac Liao',
@@ -64,7 +64,8 @@ setup(
         'Topic :: System :: Distributed Computing',
 
         # Pick your license as you wish (should match "license" above)
-        'License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)',
+        'License :: OSI Approved :: GNU Affero General Public License v3 '
+        'or later (AGPLv3+)',
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
@@ -102,7 +103,8 @@ setup(
         'python-dateutil',
         'PyYAML',
         'requests',
-        # For packaging; make sure desired files are tracked by git and setuptools-git is importable before running setuptools!
+        # For packaging; make sure desired files are tracked by git and
+        # setuptools-git is importable before running setuptools!
         'setuptools-git',
     ],
 

@@ -1,13 +1,7 @@
 #!/usr/bin/env python
+import argparse
 import os
 import sys
-from loomengine_utils.exceptions import LoomengineUtilsError
-
-if __name__ == "__main__" and __package__ is None:
-    rootdir=os.path.abspath('../..')
-    sys.path.append(rootdir)
-
-import argparse
 
 from loomengine import server
 from loomengine.common import verify_has_connection_settings, \
@@ -71,6 +65,7 @@ class RunTagAdd(object):
             (runs[0].get('name'),
              runs[0].get('uuid'),
              tag.get('tag'))
+
 
 class RunTagRemove(object):
     """Remove a run tag
@@ -193,7 +188,7 @@ class RunTag(object):
 
     def _get_args(self):
         parser = self.get_parser()
-	return parser.parse_args()
+        return parser.parse_args()
 
     @classmethod
     def get_parser(cls, parser=None):
@@ -203,7 +198,7 @@ class RunTag(object):
         if parser is None:
             parser = argparse.ArgumentParser(__file__)
 
-	subparsers = parser.add_subparsers()
+        subparsers = parser.add_subparsers()
 
         add_subparser = subparsers.add_parser(
             'add', help='add a run tag')
@@ -223,8 +218,9 @@ class RunTag(object):
         return parser
 
     def run(self):
-        return self.args.SubSubSubcommandClass(self.args, silent=self.silent).run()
+        return self.args.SubSubSubcommandClass(
+            self.args, silent=self.silent).run()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     response = RunTag().run()
