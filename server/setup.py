@@ -103,6 +103,8 @@ setup(
         'djangorestframework',
         'django-rest-swagger',
         'docker-py',                 # used by Ansible to run Docker modules and Loom server to run NGINX container
+        'elasticsearch',
+        'elasticsearch-curator',
         'eventlet',
         'flower',
         'google-api-python-client',
