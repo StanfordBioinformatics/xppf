@@ -5,6 +5,7 @@
       state: present
       image: "{{instance_image}}"
       disk_size: "{{disk_size_gb}}"
+      persistent_boot_disk: True
       zone: "{{zone}}"
       machine_type: "{{instance_type if instance_type|trim else omit}}"
       network: "{{network if network|trim else omit}}"
