@@ -536,7 +536,7 @@ class DataNode(BaseModel):
         if params:
             case_statement = ''.join(
                 ['WHEN id="%s" THEN %s' % pair for pair in params])
-            id_list = ', '.join(['%s' % pair[0] for pair in params])
+            id_list = ' '.join(['%s' % pair[0] for pair in params])
             sql = 'UPDATE api_datanode SET degree= CASE %s END WHERE id IN (%s)'\
                                                    % (case_statement, id_list)
             with django.db.connection.cursor() as cursor:
@@ -551,7 +551,7 @@ class DataNode(BaseModel):
         if params:
             case_statement = ''.join(
                 ['WHEN id="%s" THEN %s' % pair for pair in params])
-            id_list = ', '.join(['%s' % pair[0] for pair in params])
+            id_list = ' '.join(['%s' % pair[0] for pair in params])
             sql = \
                   'UPDATE api_datanode SET data_object_id= '\
                   'CASE %s END WHERE id IN (%s)'\
