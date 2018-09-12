@@ -146,6 +146,8 @@ pipeline {
         if (loomServerStarted) {
           sh '. env/bin/activate && loom server delete --confirm-server-name ${LOOM_SERVER_NAME}'
 	}
+	// uses Workspace Cleanup Plugin to delete workspace dir.
+	cleanWs()
       }
     }
     success {
