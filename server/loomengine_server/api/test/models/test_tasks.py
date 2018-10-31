@@ -8,11 +8,11 @@ from api.models.tasks import *
 def get_task():
     task = Task.objects.create(
         interpreter='/bin/bash',
-        raw_command='echo {{input1}}; echo {{ input3|join(", ") }}',
+        raw_command='echo {{input1}}; echo {{ input3|join(", ") }} {{index[1]}} {{size[1]}} {{index[2]}} {{size[2]}}',
         command='echo True',
         resources={'memory': '1', 'disk_size': '1', 'cores': '1'},
         environment={'docker_image': 'ubuntu'},
-        data_path = [[0,1],],
+        data_path = [[1,2],],
     )
     input_data_node = _get_string_data_node('input1')
 
@@ -49,27 +49,27 @@ def get_task():
 
 class TestTask(TestCase):
 
+    def setUp(self):
+        self.task = get_task()
+    
     def testCreate(self):
-        task = get_task()
-        self.assertTrue(task.command.startswith('echo'))
+        self.assertTrue(self.task.command.startswith('echo'))
 
     def testCreateAttempt(self):
-        task = get_task()
-        task_attempt = task.create_and_activate_task_attempt()
-        self.assertEqual(task_attempt.command, task.command)
+        task_attempt = self.task.create_and_activate_task_attempt()
+        self.assertEqual(task_attempt.command, self.task.command)
 
     def testGetInputContext(self):
-        task = get_task()
-        context = task.get_input_context()
+        context = self.task.get_input_context()
         self.assertEqual(context['input3'][2], 'dinero')
         self.assertEqual(str(context['input3']), 'salud amor dinero')
-        command = task.render_command(task.inputs.all(), task.outputs.all())
-        self.assertEqual(command, 'echo input1; echo salud, amor, dinero')
+        command = self.task.render_command(
+            self.task.inputs.all(), self.task.outputs.all(), self.task.data_path)
+        self.assertEqual(command, 'echo input1; echo salud, amor, dinero 2 2 1 1')
 
     def testGetContentsForFingerprint(self):
-        task = get_task()
-        self.assertEqual(task.calculate_contents_fingerprint(),
-                         'ae60c524085e58e8008fe455db3f4ac6')
+        self.assertEqual(self.task.calculate_contents_fingerprint(),
+                         'adf76dc0c0a43cbc2e5e9f8a001ccfbf')
 
 
 class TestTaskAttempt(TestCase):

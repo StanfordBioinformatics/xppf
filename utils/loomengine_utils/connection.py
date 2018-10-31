@@ -147,13 +147,14 @@ class Connection(object):
             elif e.response.status_code >= 400:
                 try:
                     message = e.response.json()
+                    import pdb; pdb.set_trace()
                 except:
                     message = e.response.text
                 if isinstance(message, list):
                     message = '; '.join(message)
                     raise ServerConnectionHttpError(message)
                 else:
-                    raise ServerConnectionHttpError(str(e))
+                    raise ServerConnectionHttpError(message)
 
     def _post_resource(self, object_data, relative_url):
         return self._post(object_data, relative_url).json()

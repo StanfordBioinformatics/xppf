@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import hashlib
 import json
 import jinja2
@@ -178,6 +178,17 @@ class DummyContext(str):
 
     def sort(self, *args, **kwargs):
         return self.items.sort(*args, **kwargs)
+
+class positiveIntegerDefaultDict(defaultdict):
+    def __getitem__(self, i):
+        if not int(i) == i:
+            raise ValidationError(
+                'Index must be an integer. Invalid value "%s"' % i)
+        if i < 1:
+            raise ValidationError(
+                'Index must be an integer greater than 0. '
+                'Invalid value "%s"' % i)
+        return super(positiveIntegerDefaultDict, self).__getitem__(i)
 
 from .data_objects import *
 from .data_nodes import *

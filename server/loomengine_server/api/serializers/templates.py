@@ -1,3 +1,4 @@
+from collections import defaultdict
 import copy
 import django.core.exceptions
 from jinja2.exceptions import UndefinedError
@@ -7,7 +8,8 @@ from . import RecursiveField, strip_empty_values, match_and_update_by_uuid, \
     reload_models
 from .data_channels import DataChannelSerializer
 from api import async
-from api.models import DummyContext, render_from_template, render_string_or_list
+from api.models import DummyContext, render_from_template, render_string_or_list, \
+    positiveIntegerDefaultDict
 from api.models.templates import Template, TemplateInput, TemplateMembership
 from api.models.data_channels import DataChannel
 from api.serializers import DataNodeSerializer
@@ -189,6 +191,9 @@ class TemplateSerializer(serializers.HyperlinkedModelSerializer):
 
     def _get_dummy_input_context(self, data):
         context = {}
+        # Return 1 if key is a positive integer, else raise ValidationError
+        context['index'] = positiveIntegerDefaultDict(lambda: 1)
+        context['size'] = positiveIntegerDefaultDict(lambda: 1)
         for input in data.get('inputs', []):
             if input.get('as_channel'):
                 channel = input.get('as_channel')

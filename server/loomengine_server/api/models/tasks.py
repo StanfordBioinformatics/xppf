@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models, IntegrityError
 from django.utils import timezone
 import logging
@@ -5,7 +6,7 @@ import jsonfield
 import time
 
 from . import render_from_template, render_string_or_list, ArrayInputContext, \
-    calculate_contents_fingerprint
+    calculate_contents_fingerprint, positiveIntegerDefaultDict
 from .base import BaseModel
 from .data_channels import DataChannel
 from api import get_setting, reload_models, match_and_update_by_uuid
@@ -17,7 +18,6 @@ from api.models.task_attempts import TaskAttempt
 from api.models import validators
 
 logger = logging.getLogger(__name__)
-
 
 class TaskAlreadyExistsException(Exception):
     pass
@@ -317,7 +317,7 @@ class Task(BaseModel):
                     data_node=data_node))
                 data_nodes[run_output.data_node.uuid] = run_output.data_node
                 data_nodes[data_node.uuid] = data_node
-            task.command = task.render_command(task_inputs, task_outputs)
+            task.command = task.render_command(task_inputs, task_outputs, data_path)
             return task, task_inputs, task_outputs, data_nodes
         except Exception as e:
             run.fail(detail='Error creating Task: "%s"' % str(e))
@@ -348,10 +348,22 @@ class Task(BaseModel):
         tm = TaskMembership(parent_task=self, child_task_attempt=task_attempt)
         tm.save()
         
-    def get_input_context(self, inputs=None):
+    def get_input_context(self, inputs=None, data_path=None):
         context = {}
         if inputs is None:
             inputs = self.inputs.all()
+        if data_path is None:
+            data_path = self.data_path
+        # For valid dimesions (integer > 0) where path is not set,
+        # return 1 for both index and size.
+        index = positiveIntegerDefaultDict(lambda: 1)
+        size = positiveIntegerDefaultDict(lambda: 1)
+        count = 1
+        for index_size_pair in data_path:
+            index[count] = index_size_pair[0]+1
+            size[count] = index_size_pair[1]
+        context['index'] = index
+        context['size'] = size
         for input in inputs:
             if input.as_channel:
                 channel = input.as_channel
@@ -383,16 +395,16 @@ class Task(BaseModel):
                 context[channel] = render_string_or_list(
                     output.source.get('filename'), input_context)
         return context
-    
-    def get_full_context(self, inputs=None, outputs=None):
-        context = self.get_input_context(inputs=inputs)
+
+    def get_full_context(self, inputs=None, outputs=None, data_path=None):
+        context = self.get_input_context(inputs=inputs, data_path=data_path)
         context.update(self.get_output_context(context, outputs=outputs))
         return context
 
-    def render_command(self, inputs, outputs):
+    def render_command(self, inputs, outputs, data_path):
         return render_from_template(
             self.raw_command,
-            self.get_full_context(inputs=inputs, outputs=outputs))
+            self.get_full_context(inputs=inputs, outputs=outputs, data_path=data_path))
 
     def get_output(self, channel):
         return self.outputs.get(channel=channel)

@@ -301,6 +301,22 @@ Why should we bother differentiating between "gather" and "gather(2)"? This exam
    # Run with custom input data
    loom run start sentence_scoring sentence='To infinity and beyond'
 
+*****************
+Special functions
+*****************
+
+The examples above demonstrated how jinja template notation can be used to incorporate input values into commands, e.g. "echo {{input1}}". The template context contains all input channel names as keys, but it also contains the special functions below.
+
+If an input uses the same name as a special function, the input value overrides.
+
+index
+=====
+*index[i]* returns the one-based index of the current task. So if a run contains 3 parallel tasks, *index[1]* will return value 1, 2, or 3 for the respective tasks. If the run contains nested parallel tasks, *index[i]* will return the index of the task in dimension *i*. If *i* is a positive integer larger than the dimensionality of the tasks, it will return a default value of 1  (e.g. *index[1]*, *index[2]*, etc. all return 1 for scalar data.). If *i* is not a positive integer value, a validation error will result.
+
+size
+====
+*size[i]* returns the size of the specified dimension. So if a run contains 3 parallel tasks, *size[1]* will return a value of 3 for all tasks. If the run contains nested parallel tasks, *size[i]* will return the size of dimension *i*. If *i* is a positive integer larger than the dimensionality of the tasks, it will return a value of 1 (e.g. *size[1]*, *size[2]*, etc. all return 1 for scalar data). If *i* is not a positive integer value, a validation error will result.
+
 *******
 Schemas
 *******
