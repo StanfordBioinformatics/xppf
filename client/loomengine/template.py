@@ -89,8 +89,11 @@ class TemplateImport(AbstractTemplateSubcommand):
                         retry=self.args.retry,
                         link_files=self.args.link_files)
                 except LoomengineUtilsError as e:
+                    msg = str(e)
+                    if not msg:
+                        msg = e.__class__
                     raise SystemExit(
-                        "ERROR! Failed to import template: '%s'" % e)
+                        "ERROR! Failed to import template: '%s'" % msg)
                 self._apply_tags(template)
                 self._apply_labels(template)
                 imported_templates.append(template)

@@ -490,7 +490,7 @@ class ImportManager(object):
                     '"%s@%s". Using existing template and skipping new '\
                     'template import.' \
                     % (existing_template['name'], existing_template['uuid']))
-                return None
+                return existing_template
         elif not force_duplicates:
             # If no UUID and force_duplicates==False,
             # check for duplicates based on hash
@@ -500,7 +500,7 @@ class ImportManager(object):
                         'Found existing template that matches name and md5 hash '\
                         '"%s$%s". Using existing template and skipping new '\
                         'template import.' % (duplicate['name'], duplicate['md5']))
-                    return None
+                    return duplicate
         file_dependency_node = self._import_file_dependencies(
             template_url, force_duplicates=force_duplicates,
             retry=retry, link_files=link_files,
@@ -641,7 +641,8 @@ class ImportManager(object):
     def _substitute_file_uuids_in_input_data_contents(
             self, contents, file_dependencies):
         if isinstance(contents, list):
-            return [self._substitute_file_uuids_in_input_data_contents(item)
+            return [self._substitute_file_uuids_in_input_data_contents(
+                item, file_dependencies)
                     for item in contents]
         elif isinstance(contents, str):
             name, uuid, tag, md5 = self._parse_reference_string(contents)
