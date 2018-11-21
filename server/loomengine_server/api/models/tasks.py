@@ -185,7 +185,6 @@ class Task(BaseModel):
             'Analysis error')
 
     def timeout_error(self, detail=''):
-        self.task_attempt.kill()
         self._process_error(
             detail,
             get_setting('MAXIMUM_RETRIES_FOR_TIMEOUT_FAILURE'),
