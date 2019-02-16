@@ -1,10 +1,11 @@
-FROM debian:jessie
+FROM ubuntu:18.04
 MAINTAINER Nathan Hammond <info@loomengine.org>
 
 # Install gcloud SDK.
 RUN apt-get update && apt-get install -y \
     curl \
     lsb-release \
+    gnupg \
     openssh-client \
     && CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" \
     && echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list \
@@ -19,10 +20,16 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
     apt-transport-https \
     ca-certificates \
-    && apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D \
-    && echo 'deb https://apt.dockerproject.org/repo debian-jessie main' > /etc/apt/sources.list.d/docker.list
+    curl \
+    gnupg-agent \
+    software-properties-common \
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add - \
+    && add-apt-repository \
+     "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+     $(lsb_release -cs) stable"
+
 RUN apt-get update && apt-get install -y \
-    docker-engine \
+    docker-ce docker-ce-cli containerd.io \
     && apt-get autoremove \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -31,7 +38,7 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
     build-essential \
     libffi-dev \
-    libmysqlclient-dev \
+    libmariadbclient-dev \
     libssl-dev \
     python-dev \
     python-pip \
@@ -39,7 +46,6 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Loom's python dependencies
 RUN pip install -U pip
 
 # Install Loom
