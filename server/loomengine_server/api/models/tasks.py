@@ -240,7 +240,7 @@ class Task(BaseModel):
 
     @classmethod
     def bulk_create_tasks(cls, unsaved_tasks, unsaved_task_inputs,
-                       unsaved_task_outputs, unsaved_data_nodes):
+                          unsaved_task_outputs, unsaved_data_nodes, force_rerun):
         if get_setting('TEST_NO_CREATE_TASK'):
             return
         all_data_nodes = DataNode.save_list_with_children(unsaved_data_nodes.values())
@@ -264,7 +264,7 @@ class Task(BaseModel):
             task.run.set_running_status()
 
         for task in tasks:
-            task.execute()
+            task.execute(force_rerun=force_rerun)
         return tasks
 
     @classmethod

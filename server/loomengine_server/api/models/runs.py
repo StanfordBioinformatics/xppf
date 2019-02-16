@@ -244,7 +244,8 @@ class Run(BaseModel):
                 unsaved_task_outputs.extend(task_outputs)
                 unsaved_data_nodes.update(data_nodes)
         Task.bulk_create_tasks(unsaved_tasks, unsaved_task_inputs,
-                               unsaved_task_outputs, unsaved_data_nodes)
+                               unsaved_task_outputs, unsaved_data_nodes,
+                               self.force_rerun)
 
     def push_all_outputs(self):
         for run in self._get_downstream_runs():
