@@ -23,7 +23,7 @@
   - vars/gcloud_worker.yml
   tasks:
   - include: tasks/gcloud_create_instance.yml use_internal_ip={{worker_uses_internal_ip}}
-  - include: tasks/gcloud_configure_instance_ssh.yml  use_internal_ip={{worker_uses_internal_ip}}
+  - include: tasks/gcloud_configure_instance_ssh.yml use_internal_ip={{worker_uses_internal_ip}}
 
 - name: Set facts on the worker instance.
   hosts: new_instances
