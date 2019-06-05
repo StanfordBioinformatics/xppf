@@ -1,3 +1,10 @@
+  - name: Pull Task Attempt image
+    docker_image: name={{task_attempt_docker_image}} api_version=auto force=True
+    register: result
+    until: not result.failed is defined or not result.failed
+    retries: 10
+    delay: 10
+
   - name: Execute a TaskAttempt
     docker_container:
       name: "{{task_attempt_monitor_container_name}}-{{task_attempt_id}}"

@@ -143,7 +143,6 @@ class TaskMonitor(object):
         try:
             self._copy_inputs()
             self._create_run_script()
-            self._pull_image()
             self._create_container()
             self._run_container()
             self._stream_docker_logs()
@@ -187,29 +186,6 @@ class TaskMonitor(object):
             error = self._get_error_text(e)
             self._report_system_error(
                 detail='Creating run script failed. %s' % error)
-            raise
-
-    def _pull_image(self):
-        self._event('Pulling image')
-        try:
-            docker_image = self._get_docker_image()
-            raw_pull_data = execute_with_retries(
-                lambda: self.docker_client.pull(docker_image),
-                (docker.errors.NotFound,),
-                self.logger,
-                "Pull docker image")
-            pull_data = self._parse_docker_output(raw_pull_data)
-            if pull_data[-1].get('errorDetail'):
-                raise Exception('Failed to pull docker image: "%s"'
-                                % pull_data[-1].get('errorDetail'))
-            container_info = self.docker_client.inspect_image(
-                self._get_docker_image())
-            self._save_environment_info(container_info)
-        except Exception as e:
-            error = self._get_error_text(e)
-            self._report_system_error(
-                detail='Pulling Docker image failed with "%s" error: '
-                '"%s"' % (e.__class__, str(e)))
             raise
 
     def _get_docker_image(self):

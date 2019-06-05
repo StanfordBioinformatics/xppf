@@ -219,6 +219,7 @@ def finish_task_attempt(task_attempt_uuid):
 
 def _run_cleanup_task_attempt_playbook(task_attempt):
     env = copy.copy(os.environ)
+    env['LOOM_TASK_ATTEMPT_DOCKER_IMAGE'] = task_attempt.environment.get('docker_image')
     playbook = os.path.join(
         get_setting('PLAYBOOK_PATH'),
         get_setting('CLEANUP_TASK_ATTEMPT_PLAYBOOK'))
