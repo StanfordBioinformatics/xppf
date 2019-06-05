@@ -122,7 +122,7 @@ class ImportManager(object):
             return None
 
         try:
-            return yaml.load(raw_metadata)
+            return yaml.load(raw_metadata, Loader=yaml.SafeLoader)
         except yaml.parser.ParserError:
             raise ImportManagerError(
                 'Metadata is not valid YAML format: "%s"' % metadata_url)

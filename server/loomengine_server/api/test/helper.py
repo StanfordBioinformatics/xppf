@@ -45,7 +45,7 @@ def request_run(template, **kwargs):
 
 def request_run_from_template_file(template_path, **kwargs):
     with open(template_path) as f:
-        template_data = yaml.load(f)
+        template_data = yaml.load(f, Loader=yaml.SafeLoader)
     s = TemplateSerializer(data=template_data)
     s.is_valid(raise_exception=True)
     template = s.save()

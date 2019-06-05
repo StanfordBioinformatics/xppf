@@ -145,7 +145,7 @@ class RunStart(AbstractRunSubcommand):
             return {}
         else:
             with open(self.args.inputs_file) as f:
-                return yaml.load(f)
+                return yaml.load(f, Loader=yaml.SafeLoader)
 
     def _apply_tags(self, run):
         if not self.args.tag:

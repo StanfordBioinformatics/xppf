@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 def parse_as_yaml(text):
     try:
-        data = yaml.load(text)
+        data = yaml.load(text, Loader=yaml.SafeLoader)
     except yaml.parser.ParserError:
         raise InvalidYamlError('Text is not valid YAML format')
     except yaml.scanner.ScannerError as e:
