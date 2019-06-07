@@ -1,42 +1,42 @@
   - name: Pull Loom image.
-    docker_image: name={{loom_docker_image}} api_version=auto force=True
+    docker_image: name={{loom_docker_image}} api_version=auto source=pull
     register: result
     until: not result.failed is defined or not result.failed
     retries: 10
     delay: 10
   - name: Pull NGINX image.
-    docker_image: name={{nginx_image}} api_version=auto force=True
+    docker_image: name={{nginx_image}} api_version=auto source=pull
     register: result
     until: not result.failed is defined or not result.failed
     retries: 10
     delay: 10
   - name: Pull RabbitMQ image.
-    docker_image: name={{rabbitmq_image}} api_version=auto force=True
+    docker_image: name={{rabbitmq_image}} api_version=auto source=pull
     register: result
     until: not result.failed is defined or not result.failed
     retries: 10
     delay: 10
   - name: Pull MySQL image when needed.
-    docker_image: name={{mysql_image}} api_version=auto force=True
+    docker_image: name={{mysql_image}} api_version=auto source=pull
     when: mysql_create_docker_container
     register: result
     until: not result.failed is defined or not result.failed
     retries: 10
     delay: 10
   - name: Pull Fluentd image.
-    docker_image: name={{fluentd_image}} api_version=auto force=True
+    docker_image: name={{fluentd_image}} api_version=auto source=pull
     register: result
     until: not result.failed is defined or not result.failed
     retries: 10
     delay: 10
   - name: Pull Elasticsearch image.
-    docker_image: name={{elasticsearch_image}} api_version=auto force=True
+    docker_image: name={{elasticsearch_image}} api_version=auto source=pull
     register: result
     until: not result.failed is defined or not result.failed
     retries: 10
     delay: 10
   - name: Pull Kibana image.
-    docker_image: name={{kibana_image}} api_version=auto force=True
+    docker_image: name={{kibana_image}} api_version=auto source=pull
     register: result
     until: not result.failed is defined or not result.failed
     retries: 10

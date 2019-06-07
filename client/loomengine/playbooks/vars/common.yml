@@ -21,7 +21,7 @@ default_registry: "{{lookup('env', 'LOOM_DEFAULT_DOCKER_REGISTRY')}}"
 raw_image: "{{lookup('env', 'LOOM_DOCKER_IMAGE')}}"
 loom_docker_image: "{% if default_registry %}{% if not ('.' in raw_image.split('/')[0]) %}{{default_registry}}/{% endif %}{% endif %}{{raw_image}}"
 raw_task_attempt_image: "{{lookup('env','LOOM_TASK_ATTEMPT_DOCKER_IMAGE')}}"
-task_attempt_docker_image: "{% if default_registry %}{% if not ('.' in raw_image.split('/')[0]) %}{{default_registry}}/{% endif %}{% endif %}{{raw_task_attempt_image}}"
+task_attempt_docker_image: "{% if default_registry %}{% if not ('.' in raw_task_attempt_image.split('/')[0]) %}{{default_registry}}/{% endif %}{% endif %}{{raw_task_attempt_image}}"
 token: "{{lookup('env', 'LOOM_TOKEN')|default('',true)}}"
 
 # HTTP settings

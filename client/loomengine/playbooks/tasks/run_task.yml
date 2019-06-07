@@ -1,5 +1,5 @@
   - name: Pull Task Attempt image
-    docker_image: name={{task_attempt_docker_image}} api_version=auto force=True
+    docker_image: name={{task_attempt_docker_image}} api_version=auto source=pull
     register: result
     until: not result.failed is defined or not result.failed
     retries: 10
