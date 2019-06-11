@@ -87,3 +87,54 @@ class TestTaskAttempt(TestCase):
                          self.task.outputs.first().source.get('stream'))
         self.assertEqual(self.task_attempt.outputs.first().source.get('filename'),
                          'input2.txt')
+
+
+class TestArrayInputContext(TestCase):
+
+    filenames = ['one', 'two.txt', 'three', 'two.txt', 'three', 'three']
+    integers = [1, 2, 3, 2, 3, 3]
+
+    def testIterFilenames(self):
+        context = ArrayInputContext(self.filenames, 'file', 
+                                    {'two.txt': 0, 'three': 0})
+        filenames = [item for item in context]
+        self.assertEqual(
+            filenames,
+            ['one', 'two__0__.txt', 'three__0__', 'two__1__.txt',
+             'three__1__', 'three__2__']
+        )
+
+    def testGetitemFilenames(self):
+        context = ArrayInputContext(self.filenames, 'file', 
+                                    {'two.txt': 0, 'three': 0})
+        self.assertEqual(context[1], 'two__0__.txt')
+
+    def testStrFilenames(self):
+        context = ArrayInputContext(self.filenames, 'file', 
+                                    {'two.txt': 0, 'three': 0})
+        string = str(context)
+        self.assertEqual(
+            string,
+            'one two__0__.txt three__0__ two__1__.txt three__1__ three__2__'
+        )
+ 
+    def testIterIntegers(self):
+        context = ArrayInputContext(self.integers, 'integer', {})
+        values = [item for item in context]
+        self.assertEqual(
+            values,
+            self.integers)
+
+
+    def testGetitemIntegers(self):
+        context = ArrayInputContext(self.integers, 'integer', {})
+        values = [item for item in context]
+        self.assertEqual(context[1], 2)
+
+    def testStrIntegers(self):
+        context = ArrayInputContext(self.integers, 'integer', {})
+        string = str(context)
+        self.assertEqual(
+            string,
+            '1 2 3 2 3 3'
+        )

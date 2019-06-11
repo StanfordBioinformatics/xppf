@@ -5,7 +5,7 @@ import logging
 import jsonfield
 import time
 
-from . import render_from_template, render_string_or_list, ArrayInputContext, \
+from . import render_from_template, render_string_or_list, \
     calculate_contents_fingerprint, positiveIntegerDefaultDict
 from .base import BaseModel
 from .data_channels import DataChannel
@@ -345,11 +345,16 @@ class Task(BaseModel):
         from api.models.task_attempts import TaskMembership
         tm = TaskMembership(parent_task=self, child_task_attempt=task_attempt)
         tm.save()
-        
+
     def get_input_context(self, inputs=None, data_path=None):
         context = {}
         if inputs is None:
             inputs = self.inputs.all()
+        # sort inputs by channel name (or as_channel)
+        inputs = [i for i in inputs]
+        inputs.sort(key=lambda i: i.get_internal_channel())
+        duplicate_filename_counters = \
+            self._get_duplicate_filename_counters(inputs)
         if data_path is None:
             data_path = self.data_path
         # For valid dimesions (integer > 0) where path is not set,
@@ -363,19 +368,31 @@ class Task(BaseModel):
         context['index'] = index
         context['size'] = size
         for input in inputs:
-            if input.as_channel:
-                channel = input.as_channel
-            else:
-                channel = input.channel
-            if input.data_node.is_leaf:
-                context[channel] = input.data_node\
-                                        .substitution_value
-            else:
-                context[channel] = ArrayInputContext(
-                    input.data_node.substitution_value,
-                    input.type
-                )
+            context[input.get_internal_channel()] \
+                = InputContext(input, duplicate_filename_counters)
         return context
+
+    def _get_duplicate_filename_counters(self, inputs):
+        counters = {}
+        all_filenames = []
+        for input in inputs:
+            if input.type == 'file':
+                if input.data_node.is_leaf():
+                    all_filenames.append(input.data_node.substitution_value)
+                else:
+                    all_filenames.extend(input.data_node.substitution_value)
+        for duplicate_filename in self._get_duplicates(all_filenames):
+            counters[duplciate_filename] = 0
+        return counters
+
+    def _get_duplicates(self, array):
+        seen = set()
+        duplicates = set()
+        for member in array:
+            if member in seen:
+                duplicates.add(member)
+            seen.add(member)
+        return duplicates
 
     def get_output_context(self, input_context, outputs=None):
         # This returns a value only for Files, where the filename
@@ -489,6 +506,12 @@ class TaskInput(DataChannel):
     mode = models.CharField(max_length=255)
     as_channel = models.CharField(max_length=255, null=True, blank=True)
 
+    def get_internal_channel(self):
+        if self.as_channel:
+            return self.as_channel
+        else:
+            return self.channel
+
     def get_fingerprintable_contents(self):
         return {
             'mode': self.mode,
@@ -533,6 +556,7 @@ class TaskEvent(BaseModel):
     detail = models.TextField(blank=True)
     is_error = models.BooleanField(default=False)
 
+
 class TaskFingerprint(BaseModel):
     value = models.CharField(max_length=255, unique=True)
     active_task_attempt = models.OneToOneField(
@@ -567,3 +591,59 @@ class TaskFingerprint(BaseModel):
             self.setattrs_and_save_with_retries(
                 {'active_task_attempt': task_attempt}
             )
+
+def _rename_duplicate(filename, counter):
+    parts = filename.split('.')
+    assert len(parts) > 0, 'missing filename'
+    if len(parts) == 1:
+        return parts[0] + '__%s__' % counter
+    else:
+        return '.'.join(
+            parts[0:len(parts)-1]) + '__%s__.' % counter + parts[-1]
+
+def _index_duplicate_filenames(filename, duplicate_filename_counters):
+    # Increment filenames if there are duplicates,
+    # e.g. file__0__.txt, file__1__.txt, file__2__.txt
+    if filename in duplicate_filename_counters:
+        counter = duplicate_filename_counters[filename]
+        duplicate_filename_counters[filename] += 1
+        filename = _rename_duplicate(filename, counter)
+    return filename
+
+
+def InputContext(input, duplicate_filename_counters):
+    """This generator returns a string for inputs with scalar data
+    or an ArrayInputContext for inputs with array data."""
+    if input.data_node.is_leaf:
+        if input.type == 'file':
+            return _index_duplicate_filenames(
+                input.data_node.substitution_value, 
+                duplicate_filename_counters)
+        else:
+            return input.data_node.substitution_value
+    else:
+        return ArrayInputContext(input.data_node.substitution_value, 
+                                 input.type, duplicate_filename_counters)
+
+
+class ArrayInputContext(object):
+    """This class is used with jinja templates to make the 
+    default representation of an array a space-delimited list.
+    """
+
+    def __init__(self, items, type, duplicate_filename_counters):
+        if type == 'file':
+            self.items = [_index_duplicate_filenames(
+                    filename, duplicate_filename_counters) 
+                          for filename in items]
+        else:
+            self.items = items
+
+    def __iter__(self):
+        return self.items.__iter__()
+
+    def __getitem__(self, i):
+        return self.items[i]
+
+    def __str__(self):
+        return ' '.join([str(item) for item in self.items])

@@ -357,58 +357,6 @@ class TaskMembership(BaseModel):
     child_task_attempt = models.ForeignKey('TaskAttempt', on_delete=models.CASCADE)
 
 
-class ArrayInputContext(object):
-    """This class is used with jinja templates to make the 
-    default representation of an array a space-delimited list.
-    """
-
-    def __init__(self, items, type):
-        if type == 'file':
-            self.items = self._rename_duplicates(items)
-        else:
-            self.items = items
-
-    def _rename_duplicates(self, filenames):
-
-        # Identify filenames that are unique
-        seen = set()
-        duplicates = set()
-        for filename in filenames:
-            if filename in seen:
-                duplicates.add(filename)
-            seen.add(filename)
-
-        new_filenames = []
-        filename_counts = {}
-        for filename in filenames:
-            if filename in duplicates:
-                counter = filename_counts.setdefault(filename, 0)
-                filename_counts[filename] += 1
-                filename = self._add_counter_suffix(filename, counter)
-            new_filenames.append(filename)
-        return new_filenames
-
-    def _add_counter_suffix(self, filename, count):
-        # Add suffix while preserving file extension:
-        #   myfile -> myfile.__1__
-        #   myfile.txt --> myfile__1__.txt
-        #   my.file.txt --> my.file__1__.txt
-        parts = filename.split('.')
-        assert len(parts) > 0, 'missing filename'
-        if len(parts) == 1:
-            return parts[0] + '(%s)' % count
-        else:
-            return '.'.join(parts[0:len(parts)-1]) + '__%s__.' % count + parts[-1]
-
-    def __iter__(self):
-        return self.items.iter()
-
-    def __getitem__(self, i):
-        return self.items[i]
-
-    def __str__(self):
-        return ' '.join([str(item) for item in self.items])
-
 # To run on new thread
 def _run_execute_task_attempt_playbook(task_attempt):
     from django.contrib.auth.models import User

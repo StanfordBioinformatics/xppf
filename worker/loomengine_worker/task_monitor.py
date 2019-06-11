@@ -160,14 +160,7 @@ class TaskMonitor(object):
         if self.task_attempt.get('inputs') is None:
             return
         try:
-            for input in self.task_attempt['inputs']:
-                TaskAttemptInput(input, self).copy()
-        except FileAlreadyExistsError as e:
-            error = self._get_error_text(e)
-            self._report_system_error(
-                detail='Copying inputs failed because file already exists. '
-                'Are there multiple inputs with the same name? %s' % error)
-            raise
+            TaskAttemptInputs(self.task_attempt['inputs'], self).copy()
         except Exception as e:
             error = self._get_error_text(e)
             self._report_system_error(

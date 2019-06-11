@@ -220,7 +220,7 @@ class DataNode(BaseModel):
                     last_paths = new_paths
             # Convert to set to remove duplicates created by gathering
             return paths
-        
+
     def is_ready(self, data_path=None):
         # True if all data at or below the given index is ready.
         if data_path is not None:

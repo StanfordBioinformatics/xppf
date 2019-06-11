@@ -4,7 +4,7 @@ import hashlib
 import json
 
 from api.models import render_from_template, render_string_or_list, \
-    ArrayInputContext, calculate_contents_fingerprint
+    calculate_contents_fingerprint
 
 
 class TestRenderFromTemplate(TestCase):
@@ -14,6 +14,7 @@ class TestRenderFromTemplate(TestCase):
         context = {'name': 'Inigo'}
         rendered_text = render_from_template(raw_text, context)
         self.assertEqual(rendered_text, 'My name is Inigo')
+
 
 class TestRenderFromStringOrList(TestCase):
 
@@ -29,52 +30,7 @@ class TestRenderFromStringOrList(TestCase):
         rendered_text = render_string_or_list(raw_text, context)
         self.assertEqual(rendered_text, ['Name: Inigo', 'Nome: Inigo', 'Nombre: Inigo'])
 
-class TestArrayInputContext(TestCase):
 
-    filenames = ['one', 'two.txt', 'three', 'two.txt', 'three', 'three']
-    integers = [1, 2, 3, 2, 3, 3]
-
-    def testIterFilenames(self):
-        context = ArrayInputContext(self.filenames, 'file')
-        filenames = [item for item in context]
-        self.assertEqual(
-            filenames,
-            ['one', 'two__0__.txt', 'three__0__', 'two__1__.txt',
-             'three__1__', 'three__2__']
-        )
-
-    def testGetitemFilenames(self):
-        context = ArrayInputContext(self.filenames, 'file')
-        self.assertEqual(context[1], 'two__0__.txt')
-
-    def testStrFilenames(self):
-        context = ArrayInputContext(self.filenames, 'file')
-        string = str(context)
-        self.assertEqual(
-            string,
-            'one two__0__.txt three__0__ two__1__.txt three__1__ three__2__'
-        )
- 
-    def testIterIntegers(self):
-        context = ArrayInputContext(self.integers, 'integer')
-        values = [item for item in context]
-        self.assertEqual(
-            values,
-            self.integers)
-
-
-    def testGetitemIntegers(self):
-        context = ArrayInputContext(self.integers, 'integer')
-        values = [item for item in context]
-        self.assertEqual(context[1], 2)
-
-    def testStrIntegers(self):
-        context = ArrayInputContext(self.integers, 'integer')
-        string = str(context)
-        self.assertEqual(
-            string,
-            '1 2 3 2 3 3'
-        )
 class TestCalculateContentsFingerprint(TestCase):
 
     def testString(self):

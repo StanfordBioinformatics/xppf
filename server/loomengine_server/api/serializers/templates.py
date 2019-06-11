@@ -8,7 +8,7 @@ from . import RecursiveField, strip_empty_values, match_and_update_by_uuid, \
     reload_models
 from .data_channels import DataChannelSerializer
 from api import async
-from api.models import DummyContext, render_from_template, render_string_or_list, \
+from api.models import render_from_template, render_string_or_list, \
     positiveIntegerDefaultDict
 from api.models.templates import Template, TemplateInput, TemplateMembership
 from api.models.data_channels import DataChannel
@@ -656,3 +656,53 @@ class CycleDetector(object):
                 'Cycle detected in steps "%s"' % '", "'.join(cycle_steps))
         elif vertex in self.black:
             return
+
+
+class DummyContext(str):
+    """This class is used to create dummy context values used to validate 
+    jinja templates during Template validation, before actual context values 
+    are known. It acts as both a string and a list and attempts to avoid 
+    raising any errors for usage that could be valid for some
+    particular string or list.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(DummyContext, self).__init__(self, *args, **kwargs)
+        string = args[0]
+        self.items = [letter for letter in string]
+
+    def __iter__(self, *args, **kwargs):
+        return self.items.__iter__(*args, **kwargs)
+
+    def __len__(self,*args,**kwargs):
+        return self.items.__len__(*args, **kwargs)
+
+    def __getitem__(self, i):
+        return 'x'
+
+    def append(self, *args, **kwargs):
+        return self.items.append(*args, **kwargs)
+
+    def count(self, *args, **kwargs):
+        return self.items.count(*args, **kwargs)
+
+    def extend(self, *args, **kwargs):
+        return self.items.extend(*args, **kwargs)
+
+    def index(self, *args, **kwargs):
+        return self.items.index(*args, **kwargs)
+
+    def insert(self, *args, **kwargs):
+        return self.items.insert(*args, **kwargs)
+
+    def pop(self, *args, **kwargs):
+        return self.items.pop(*args, **kwargs)
+
+    def remove(self, *args, **kwargs):
+        return self.items.remove(*args, **kwargs)
+
+    def reverse(self, *args, **kwargs):
+        return self.items.reverse(*args, **kwargs)
+
+    def sort(self, *args, **kwargs):
+        return self.items.sort(*args, **kwargs)
