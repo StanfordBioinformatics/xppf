@@ -382,7 +382,7 @@ class Task(BaseModel):
                 else:
                     all_filenames.extend(input.data_node.substitution_value)
         for duplicate_filename in self._get_duplicates(all_filenames):
-            counters[duplciate_filename] = 0
+            counters[duplicate_filename] = 0
         return counters
 
     def _get_duplicates(self, array):
