@@ -25,7 +25,7 @@ from loomengine_utils.exceptions import FileAlreadyExistsError
 from loomengine_utils.export_manager import ExportManager
 from loomengine_utils.import_manager import ImportManager
 from loomengine_worker.outputs import TaskAttemptOutput
-from loomengine_worker.inputs import TaskAttemptInput
+from loomengine_worker.inputs import TaskAttemptInputs
 
 
 class TaskMonitor(object):
