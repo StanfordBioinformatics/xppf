@@ -377,7 +377,7 @@ class Task(BaseModel):
         all_filenames = []
         for input in inputs:
             if input.type == 'file':
-                if input.data_node.is_leaf():
+                if input.data_node.is_leaf:
                     all_filenames.append(input.data_node.substitution_value)
                 else:
                     all_filenames.extend(input.data_node.substitution_value)
