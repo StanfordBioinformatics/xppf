@@ -105,7 +105,7 @@ class TaskAttemptInputs(object):
 
     def __init__(self, inputs, task_attempt):
         self.filename_counters = {} # filename: number of times seen
-        self.inputs = [TaskAttemptInput[input] for input in inputs]
+        self.inputs = [TaskAttemptInput(input, task_attempt) for input in inputs]
         # Inputs are sorted by channel name for consistent indexing of 
         # duplicate filenames, i.e. duplicatename__0__.ext, duplicatename__1__.ext. 
         # Indexing is applied in alphanumeric order of input channel names.
